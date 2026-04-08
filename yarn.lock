@@ -8521,10 +8521,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"nodemailer@npm:^7.0.11":
-  version: 7.0.11
-  resolution: "nodemailer@npm:7.0.11"
-  checksum: 10c0/208f108fdb4c5dd0e3a2f013578d53dad505cf1b9c7a084f6d22fc9d6f3912daafb4a23793ca568ff848afc35f15f4eb24382d3f6f9fb8ede4a8410d4ca63618
+"nodemailer@npm:^8.0.5":
+  version: 8.0.5
+  resolution: "nodemailer@npm:8.0.5"
+  checksum: 10c0/5e8450499bd059c56d74ba96fa5f9928de2ecdae0d53c083dba5661d797114c1f9524d30f992d0263cc5a7dcf5a54b9c1d92dc1f766da150c9d0bde7d3798431
   languageName: node
   linkType: hard
 
@@ -10354,7 +10354,7 @@ __metadata:
     jsonwebtoken: "npm:^9.0.2"
     lucide-react: "npm:^0.561.0"
     next: "npm:^16.1.6"
-    nodemailer: "npm:^7.0.11"
+    nodemailer: "npm:^8.0.5"
     phaser: "npm:^3.90.0"
     postcss: "npm:^8.5.6"
     prisma: "npm:^6.1.0"
