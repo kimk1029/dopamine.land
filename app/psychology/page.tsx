@@ -16,7 +16,7 @@ export default function PsychologyPortalPage() {
   return (
     <div className="min-h-screen bg-[#09090b] text-slate-100 overflow-x-hidden">
       <HeaderNavigator />
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24 pb-20">
+      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-20">
         <h1 className="text-3xl sm:text-4xl font-black text-white mb-2">심리테스트</h1>
         <p className="text-slate-400 mb-10">원하는 테스트를 골라보세요.</p>
 

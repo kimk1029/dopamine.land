@@ -83,7 +83,7 @@ export default function SajuPage() {
   return (
     <div className="min-h-screen bg-[#09090b] text-slate-100">
       <HeaderNavigator />
-      <main className="container mx-auto px-4 sm:px-6 pt-24 pb-20">
+      <main className="container mx-auto px-4 sm:px-6 pb-20">
         <Link href="/psychology" className="inline-flex items-center text-slate-500 hover:text-slate-400 text-sm mb-6">← 심리테스트</Link>
         <h1 className="text-2xl font-bold text-white mb-2">사주</h1>
         <p className="text-slate-400 mb-8">생년월일을 입력하면 중앙 리포트 형태로 사주 풀이를 보여드려요. (재미용)</p>

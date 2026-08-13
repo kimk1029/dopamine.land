@@ -10,9 +10,8 @@ interface GameContainerProps {
 export default function GameContainer({ children, className = '', centerContent = true, isDemo = false }: GameContainerProps) {
   return (
     <div className="h-screen bg-gray-900 flex flex-col overflow-hidden">
-      {/* 상단 네비게이션 공간 확보 (HeaderNavigator 높이 약 64px) */}
-      {/* 여백 요구사항: 상단 네비+30px, 좌우 50px, 하단 30px */}
-      <div className="flex-1 flex flex-col pt-[94px] px-0 md:px-[50px] pb-[30px] w-full h-full overflow-hidden relative">
+      {/* 여백 요구사항: 상단 30px, 좌우 50px, 하단 30px */}
+      <div className="flex-1 flex flex-col pt-[30px] px-0 md:px-[50px] pb-[30px] w-full h-full overflow-hidden relative">
         {/* 데모 모드 배지 */}
         {isDemo && (
           <div className="absolute top-[30px] left-1/2 transform -translate-x-1/2 z-50 pointer-events-none">

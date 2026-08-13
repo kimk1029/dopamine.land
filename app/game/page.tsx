@@ -239,7 +239,7 @@ export default function GameLobby() {
         <div className="min-h-screen bg-[#09090b] text-slate-100 overflow-x-hidden selection:bg-indigo-500/30">
             <HeaderNavigator />
 
-            <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24 pb-20">
+            <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-20">
                 {/* Header & Summary */}
                 <section className="mb-12 flex flex-col md:flex-row justify-between items-end gap-6">
                     <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>

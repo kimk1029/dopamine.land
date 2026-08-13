@@ -105,7 +105,7 @@ export default function Home() {
         <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-[#0a0a0c] to-black text-slate-100 overflow-x-hidden selection:bg-purple-500/30">
             <HeaderNavigator />
 
-            <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24 pb-20">
+            <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-20">
 
                 {/* 1. Billboard Section (Top Most) */}
                 <section className="mb-10">

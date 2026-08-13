@@ -177,7 +177,7 @@ export default function ChargePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0c] pt-24 pb-12 px-4">
+    <div className="min-h-screen bg-[#0a0a0c] pb-12 px-4">
       <div className="container mx-auto max-w-5xl">
         <div className="flex items-center gap-3 mb-8">
             <div className="p-3 rounded-full bg-yellow-500/10 text-yellow-500">

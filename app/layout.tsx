@@ -1,11 +1,14 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import '@/styles/arcade/arcade.css'
+import '@/styles/arcade/arcade-components.css'
 import GoogleAdsense from '@/components/GoogleAdsense'
 import OnlineUsers from '@/components/OnlineUsers'
+import ArcadeShell from '@/components/layout/ArcadeShell'
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://dopamine-ground.vercel.app'),
-  title: 'DOPAMINE LAND | 도파민랜드',
+  title: 'KUJIHUB | 쿠지허브',
   description: '지금 접속하면 100포인트 무료! 실시간 랭킹 1위에 도전하세요.',
   icons: {
     icon: [
@@ -15,10 +18,10 @@ export const metadata: Metadata = {
     apple: '/arcade-icon.svg',
   },
   openGraph: {
-    title: 'DOPAMINE LAND | 도파민랜드',
+    title: 'KUJIHUB | 쿠지허브',
     description: '지금 접속하면 100포인트 무료! 실시간 랭킹 1위에 도전하세요.',
     url: 'https://dopamine-ground.vercel.app',
-    siteName: 'DOPAMINE LAND',
+    siteName: 'KUJIHUB',
     images: [
       {
         url: '/images/og-default.png',
@@ -48,7 +51,7 @@ export default function RootLayout({
         <GoogleAdsense pId={process.env.NEXT_PUBLIC_GOOGLE_ADSENSE_ID || ''} />
       </head>
       <body suppressHydrationWarning>
-        {children}
+        <ArcadeShell>{children}</ArcadeShell>
         <OnlineUsers />
       </body>
     </html>

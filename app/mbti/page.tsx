@@ -58,7 +58,7 @@ export default function MBTITestPage() {
         />
       </div>
 
-      <main className="container mx-auto px-4 sm:px-6 pt-24 pb-20 min-h-screen flex flex-col items-center justify-center">
+      <main className="container mx-auto px-4 sm:px-6 pb-20 min-h-screen flex flex-col items-center justify-center">
         <div className="max-w-md w-full space-y-8">
           {/* 질문 카운터 */}
           <div className="text-center">

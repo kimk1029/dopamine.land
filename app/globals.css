@@ -1,74 +1,156 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;900&display=swap');
+@import url('https://cdn.jsdelivr.net/npm/galmuri@2.40.3/dist/galmuri.css');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 263.4 70% 50.4%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 263.4 70% 50.4%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
-    --radius: 0.75rem;
+    /* ── Arcade base palette (kujihub) ───────────────────────────── */
+    --arcade-bg: #0a0a1a;
+    --arcade-surface: #1a1a2e;
+    --arcade-primary: #ff00ff;
+    --arcade-secondary: #00ffff;
+    --arcade-accent: #39ff14;
+    --arcade-text: #ffffff;
+    --arcade-border: #ffffff;
+
+    --error: #ff0033;
+    --success: #39ff14;
+
+    /* ── Glitch terminal tokens (kujihub) ────────────────────────── */
+    --gt-bg: #140727;
+    --gt-surface: #201139;
+    --gt-surface-low: #190b30;
+    --gt-surface-high: #271641;
+    --gt-surface-highest: #2e1c4b;
+    --gt-surface-bright: #352254;
+    --gt-surface-lowest: #000000;
+    --gt-primary: #ff7cf5;
+    --gt-primary-dim: #ff51fa;
+    --gt-primary-container: #ff5af9;
+    --gt-on-primary: #580058;
+    --gt-on-primary-container: #440044;
+    --gt-secondary: #00fbfb;
+    --gt-secondary-container: #006a6a;
+    --gt-on-secondary: #005c5c;
+    --gt-tertiary: #8eff71;
+    --gt-tertiary-container: #2ff801;
+    --gt-on-tertiary: #0d6100;
+    --gt-on-tertiary-container: #064200;
+    --gt-error: #ff6e84;
+    --gt-error-container: #a70138;
+    --gt-on-surface: #eee0ff;
+    --gt-on-surface-variant: #b5a4cd;
+    --gt-outline: #7e6f95;
+    --gt-outline-variant: #4f4165;
+
+    /* ── shadcn tokens, remapped onto the arcade palette ─────────── */
+    --background: 240 44% 7%;
+    --foreground: 0 0% 100%;
+    --card: 240 28% 14%;
+    --card-foreground: 0 0% 100%;
+    --popover: 240 28% 14%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 300 100% 50%;
+    --primary-foreground: 240 44% 7%;
+    --secondary: 180 100% 50%;
+    --secondary-foreground: 240 44% 7%;
+    --muted: 263 54% 15%;
+    --muted-foreground: 265 29% 72%;
+    --accent: 111 100% 54%;
+    --accent-foreground: 240 44% 7%;
+    --destructive: 348 100% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 263 22% 33%;
+    --input: 263 22% 33%;
+    --ring: 300 100% 50%;
+    /* Arcade cabinets have square corners. */
+    --radius: 0px;
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 263.4 70% 50.4%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 263.4 70% 50.4%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --background: 240 44% 7%;
+    --foreground: 0 0% 100%;
+    --card: 240 28% 14%;
+    --card-foreground: 0 0% 100%;
+    --popover: 240 28% 14%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 300 100% 50%;
+    --primary-foreground: 240 44% 7%;
+    --secondary: 180 100% 50%;
+    --secondary-foreground: 240 44% 7%;
+    --muted: 263 54% 15%;
+    --muted-foreground: 265 29% 72%;
+    --accent: 111 100% 54%;
+    --accent-foreground: 240 44% 7%;
+    --destructive: 348 100% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 263 22% 33%;
+    --input: 263 22% 33%;
+    --ring: 300 100% 50%;
   }
 }
 
 @layer base {
   * {
     @apply border-border;
+    -webkit-tap-highlight-color: transparent;
   }
+
+  html,
+  body {
+    cursor: url('/arcade/cursor-hand.svg') 5 1, auto;
+  }
+
   body {
     @apply bg-background text-foreground;
-    /* 글로벌 배경 설정 (모든 페이지 공통) */
-    background: radial-gradient(ellipse at top, #1e1b4b 0%, #020617 100%);
-    min-height: 100dvh; /* 모바일 뷰포트 높이 최적화 (vh -> dvh) */
+    font-family: 'Galmuri11', 'VT323', monospace;
+    background-color: var(--arcade-bg);
+    line-height: 1.6;
+    min-height: 100dvh;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Galmuri11', sans-serif;
+    font-weight: normal;
+    text-transform: uppercase;
+  }
+
+  button, input, textarea, select {
+    font-family: 'Galmuri11', sans-serif;
+  }
+
+  a,
+  button,
+  label,
+  select,
+  summary,
+  [role='button'],
+  input[type='button'],
+  input[type='submit'],
+  input[type='reset'] {
+    cursor: url('/arcade/cursor-hand-click.svg') 5 1, pointer;
   }
 }
 
 @layer utilities {
+  /* Press Start 2P — reserved for menus, labels and titles. */
+  .arcade-font-pixel {
+    font-family: 'Press Start 2P', cursive !important;
+  }
+
   .glass {
-    @apply bg-black/30 backdrop-blur-md border border-white/10 shadow-xl;
+    @apply bg-black/50 backdrop-blur-md border border-white/10 shadow-xl;
   }
   .glass-hover {
-    @apply hover:bg-black/40 hover:border-white/20 transition-all duration-300;
+    @apply hover:bg-black/60 hover:border-[var(--arcade-secondary)] transition-all duration-300;
   }
   .text-glow {
-    text-shadow: 0 0 10px rgba(139, 92, 246, 0.5);
+    text-shadow: 0 0 10px var(--arcade-primary), 0 0 20px rgba(255, 0, 255, 0.4);
   }
 }

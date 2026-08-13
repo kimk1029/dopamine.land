@@ -17,7 +17,7 @@ export default function NoticePage() {
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-[#0a0a0c] to-black text-slate-100 overflow-x-hidden">
       <HeaderNavigator />
       
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-24 pb-20">
+      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-20">
         <div className="max-w-4xl mx-auto">
             <h1 className="text-3xl font-bold mb-8 flex items-center gap-3">
                 <Bell className="w-8 h-8 text-yellow-400" />

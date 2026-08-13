@@ -17,7 +17,7 @@ export default function MBTIResultPage() {
     return (
       <div className="min-h-screen bg-[#09090b] text-slate-100">
         <HeaderNavigator />
-        <main className="container mx-auto px-4 pt-24 pb-20 flex flex-col items-center justify-center min-h-[80vh]">
+        <main className="container mx-auto px-4 pb-20 flex flex-col items-center justify-center min-h-[80vh]">
           <h1 className="text-2xl font-bold text-white mb-4">존재하지 않는 결과입니다.</h1>
           <div className="flex gap-3">
             <Link href="/mbti" className="px-5 py-2.5 bg-violet-600 hover:bg-violet-500 rounded-xl font-bold text-white transition-colors">
@@ -44,7 +44,7 @@ export default function MBTIResultPage() {
     <div className="min-h-screen bg-[#09090b] text-slate-100 overflow-x-hidden">
       <HeaderNavigator />
 
-      <main className="container mx-auto px-4 sm:px-6 pt-24 pb-20 py-12">
+      <main className="container mx-auto px-4 sm:px-6 pb-20 py-12">
         <div className="max-w-md mx-auto bg-[#18181b] rounded-3xl overflow-hidden shadow-2xl border border-white/10">
 
           {/* 결과 헤더 영역 */}

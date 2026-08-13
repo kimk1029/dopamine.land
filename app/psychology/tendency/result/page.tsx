@@ -49,7 +49,7 @@ function TendencyResultContent() {
     return (
       <div className="min-h-screen bg-[#09090b] text-slate-100">
         <HeaderNavigator />
-        <main className="container mx-auto px-4 sm:px-6 pt-24 pb-20 flex flex-col items-center justify-center min-h-[80vh]">
+        <main className="container mx-auto px-4 sm:px-6 pb-20 flex flex-col items-center justify-center min-h-[80vh]">
           <h1 className="text-2xl font-bold text-white mb-2">결과 정보를 찾을 수 없어요.</h1>
           <p className="text-slate-400 mb-6 text-center">테스트를 완료한 뒤 결과 페이지로 이동해 주세요.</p>
           <Link
@@ -66,7 +66,7 @@ function TendencyResultContent() {
   return (
     <div className="min-h-screen bg-[#09090b] text-slate-100 overflow-x-hidden">
       <HeaderNavigator />
-      <main className="container mx-auto px-4 sm:px-6 pt-24 pb-20">
+      <main className="container mx-auto px-4 sm:px-6 pb-20">
         <div className="max-w-3xl mx-auto bg-[#18181b] border border-white/10 rounded-2xl p-6 md:p-8 space-y-6">
           <div className="text-center">
             <p className="text-sm text-cyan-300/80">성 성향 테스트 결과 리포트</p>
