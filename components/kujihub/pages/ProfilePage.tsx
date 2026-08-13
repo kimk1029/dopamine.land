@@ -5,10 +5,16 @@ import dayjs from 'dayjs';
 import { useRouter } from 'next/navigation';
 import { ArcadeBox, ArcadeButton } from '@/components/arcade';
 import { getWebAuthSession } from '@/lib/kujihub/auth/webAuth';
-import { communityApi } from '@/lib/kujihub/api/community';
 import { ensureKujiPlayer } from '@/lib/kujihub/api/kujiDraw';
-import type { CommunityPost } from '@/lib/kujihub/types/community';
 import type { KujiPlayer } from '@/lib/kujihub/types/kujiDraw';
+import { loadSessionUser, type SessionUser } from '@/lib/user-session';
+
+/** 통합 게시판(/api/posts)에서 읽어온 내 글 목록 항목. */
+interface MyPost {
+  id: number;
+  title: string;
+  createdAt: string;
+}
 
 // Level & Character Logic
 const POINTS_PER_LEVEL = 500;
@@ -131,7 +137,8 @@ export function ProfilePage() {
   const router = useRouter();
   const session = getWebAuthSession();
   const [player, setPlayer] = useState<KujiPlayer | null>(null);
-  const [posts, setPosts] = useState<CommunityPost[]>([]);
+  const [arcadeUser, setArcadeUser] = useState<SessionUser | null>(null);
+  const [posts, setPosts] = useState<MyPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isLevelHelpOpen, setIsLevelHelpOpen] = useState(false);
@@ -145,13 +152,24 @@ export function ProfilePage() {
       setLoading(true);
       setError(null);
       try {
-        const [playerData, communityPosts] = await Promise.all([
+        const [playerData, boardPosts, sessionUser] = await Promise.all([
           ensureKujiPlayer(userName),
-          communityApi.getList(),
+          fetch('/api/posts').then((r) => (r.ok ? r.json() : [])),
+          loadSessionUser(),
         ]);
         if (!cancelled) {
           setPlayer(playerData);
-          setPosts(communityPosts.filter((post) => post.author === userName).slice(0, 5));
+          setArcadeUser(sessionUser);
+          // 내 글: 쿠지허브 소셜 이름 또는 아케이드 닉네임과 작성자가 일치하는 글
+          const myNames = new Set(
+            [userName, sessionUser?.nickname, sessionUser?.email?.split('@')[0]].filter(Boolean)
+          );
+          setPosts(
+            (boardPosts as Array<{ bbs_uid: number; title: string; author: string; creation_date: string }>)
+              .filter((post) => myNames.has(post.author))
+              .slice(0, 5)
+              .map((post) => ({ id: post.bbs_uid, title: post.title, createdAt: post.creation_date }))
+          );
         }
       } catch (loadError) {
         if (!cancelled) {
@@ -164,9 +182,13 @@ export function ProfilePage() {
     return () => { cancelled = true; };
   }, [userName]);
 
-  const levelInfo = useMemo(() => getLevelInfo(player?.points ?? 0), [player?.points]);
+  // 포인트 단일화: 아케이드(도파민랜드) 계정이 있으면 그 포인트가 대표 잔액이고,
+  // 없으면 쿠지허브 서버 지갑을 그대로 보여준다. 레벨/캐릭터도 이 값 기준.
+  const currentPoints = arcadeUser
+    ? Math.floor(arcadeUser.points ?? 0)
+    : player?.points ?? 0;
+  const levelInfo = useMemo(() => getLevelInfo(currentPoints), [currentPoints]);
   const joinedLabel = useMemo(() => session?.createdAt ? dayjs(session.createdAt).format('YYYY.MM.DD HH:mm') : '-', [session?.createdAt]);
-  const currentPoints = player?.points ?? 0;
 
   return (
     <div className="animate-in">
@@ -175,7 +197,7 @@ export function ProfilePage() {
           PLAYER_DASHBOARD
         </h1>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <ArcadeButton variant="secondary" size="sm" onClick={() => router.push('/community/new')}>
+          <ArcadeButton variant="secondary" size="sm" onClick={() => router.push('/comm')}>
             NEW_LOG
           </ArcadeButton>
           <ArcadeButton variant="accent" size="sm" onClick={() => window.location.reload()}>
@@ -254,9 +276,15 @@ export function ProfilePage() {
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ opacity: 0.6, fontWeight: 700, fontSize: '0.8rem' }}>TOTAL_CREDITS</span>
                 <span style={{ fontWeight: 900, color: 'var(--arcade-accent)' }}>
-                  {(player?.points ?? 0).toLocaleString()} P
+                  {currentPoints.toLocaleString()} P
                 </span>
               </div>
+              {arcadeUser && player ? (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ opacity: 0.6, fontWeight: 700, fontSize: '0.8rem' }}>KUJI_WALLET</span>
+                  <span style={{ fontWeight: 900 }}>{(player.points ?? 0).toLocaleString()} P</span>
+                </div>
+              ) : null}
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ opacity: 0.6, fontWeight: 700, fontSize: '0.8rem' }}>ACCESS_LEVEL</span>
                 <span style={{ fontWeight: 900 }}>{(player?.role || 'user').toUpperCase()}</span>
@@ -294,7 +322,7 @@ export function ProfilePage() {
                   <button
                     key={post.id}
                     type="button"
-                    onClick={() => router.push(`/community/${post.id}`)}
+                    onClick={() => router.push(`/comm/${post.id}`)}
                     style={{
                       padding: '14px 20px',
                       border: '2px solid #222',
@@ -328,7 +356,7 @@ export function ProfilePage() {
               <ArcadeButton variant="primary" size="md" onClick={() => router.push('/kuji')} style={{ width: '100%', margin: 0 }}>
                 KUJI_STATION
               </ArcadeButton>
-              <ArcadeButton variant="secondary" size="md" onClick={() => router.push('/community')} style={{ width: '100%', margin: 0 }}>
+              <ArcadeButton variant="secondary" size="md" onClick={() => router.push('/comm')} style={{ width: '100%', margin: 0 }}>
                 COMM_BOARD
               </ArcadeButton>
               <ArcadeButton variant="accent" size="md" onClick={() => router.push('/feed')}>
