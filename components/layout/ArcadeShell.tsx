@@ -27,9 +27,8 @@ const NAV_ITEMS: NavItem[] = [
   { path: '/game', label: 'GAME', icon: '🕹️', mobile: true },
   { path: '/game/kuji', label: 'KUJI', icon: '🎰', mobile: true },
   { path: '/leaderboard', label: 'RANK', icon: '🏆' },
-  { path: '/board', label: 'BOARD', icon: '📋', mobile: true },
+  { path: '/comm', label: 'COMM', icon: '📡', mobile: true },
   { path: '/charge', label: 'CHARGE', icon: '⚡' },
-  { path: '/notice', label: 'NOTICE', icon: '📢' },
   { path: '/profile', label: 'MY', icon: '👤', mobile: true },
   { path: '/admin', label: 'ADMIN', icon: '🛡️', adminOnly: true },
 ]
@@ -166,9 +165,9 @@ export default function ArcadeShell({ children }: { children: React.ReactNode })
             />
             <span
               className="arcade-font-pixel"
-              style={{ color: 'var(--arcade-primary)', fontSize: '1rem' }}
+              style={{ color: 'var(--arcade-primary)', fontSize: '0.72rem' }}
             >
-              KUJIHUB
+              DOPAMINE.LAND
             </span>
           </Link>
         </div>
@@ -253,14 +252,14 @@ export default function ArcadeShell({ children }: { children: React.ReactNode })
           marginLeft: '280px',
           width: 'calc(100% - 280px)',
           minHeight: '100vh',
-          padding: '40px',
+          padding: '24px',
           position: 'relative',
           zIndex: 1,
           boxSizing: 'border-box',
           overflowX: 'hidden',
         }}
       >
-        <div className="page-shell" style={{ maxWidth: '1400px', margin: '0 auto' }}>
+        <div className="page-shell" style={{ width: '100%' }}>
           <div
             className="layout-userbar"
             style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '24px' }}

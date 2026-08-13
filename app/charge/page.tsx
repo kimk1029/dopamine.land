@@ -1,13 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Loader2, CheckCircle2, PlayCircle, Gift, Zap } from 'lucide-react'
+import { ArcadeBox, ArcadeButton, ArcadeTicker } from '@/components/arcade'
 import AdBanner from '@/components/AdBanner'
-import { refreshUserPoints } from '@/components/HeaderNavigator'
+import { refreshUserPoints } from '@/lib/user-session'
 
 type Mission = {
   id: string
@@ -24,7 +20,7 @@ export default function ChargePage() {
   const [loading, setLoading] = useState(true)
   const [missions, setMissions] = useState<Mission[]>([])
   const [adLoading, setAdLoading] = useState(false)
-  
+
   // 보상 모달 상태
   const [showRewardModal, setShowRewardModal] = useState(false)
   const [rewardAmount, setRewardAmount] = useState(0)
@@ -49,7 +45,7 @@ export default function ChargePage() {
       }
 
       const data = await res.json()
-      
+
       const newMissions: Mission[] = [
         {
           id: 'post_10',
@@ -124,7 +120,7 @@ export default function ChargePage() {
     // 실제로는 여기서 구글 애드센스 보상형 광고 API를 호출하거나
     // 전면 광고를 띄워야 함. 웹에서는 보통 전면 광고 후 콜백으로 처리.
     // 여기서는 "광고를 봤다"고 가정하고 바로 지급 API 호출
-    
+
     setTimeout(async () => {
       try {
         const token = localStorage.getItem('token')
@@ -153,9 +149,9 @@ export default function ChargePage() {
         const token = localStorage.getItem('token')
         const res = await fetch('/api/charge/claim', {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}` 
+                Authorization: `Bearer ${token}`
             },
             body: JSON.stringify({ missionId })
         })
@@ -177,188 +173,280 @@ export default function ChargePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0c] pb-12 px-4">
-      <div className="container mx-auto max-w-5xl">
-        <div className="flex items-center gap-3 mb-8">
-            <div className="p-3 rounded-full bg-yellow-500/10 text-yellow-500">
-                <Zap className="w-8 h-8" />
-            </div>
-            <div>
-                <h1 className="text-3xl font-bold text-white">충전소</h1>
-                <p className="text-slate-400">포인트를 무료로 획득할 수 있는 다양한 방법들을 확인하세요.</p>
-            </div>
+    <div className="animate-in">
+      {/* 페이지 헤더 */}
+      <header className="page-header" style={{ display: 'flex', alignItems: 'flex-end', marginBottom: '32px' }}>
+        <div>
+          <h1
+            className="arcade-font-pixel glitch-text"
+            style={{ color: 'var(--arcade-primary)', fontSize: '1.6rem', marginBottom: '12px' }}
+          >
+            INSERT_COIN
+          </h1>
+          <p style={{ color: '#fff', opacity: 0.8, fontWeight: 500 }}>
+            포인트를 무료로 획득할 수 있는 다양한 방법들을 확인하세요.
+          </p>
         </div>
+      </header>
 
-        {/* 광고 영역 */}
-        <section className="mb-12">
-            <Card className="bg-gradient-to-br from-indigo-900/50 to-violet-900/50 border-indigo-500/30 overflow-hidden relative">
-                <div className="absolute top-0 right-0 p-32 bg-indigo-500/10 blur-[100px] rounded-full" />
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-2xl text-white">
-                        <PlayCircle className="text-yellow-400" />
-                        광고 보고 포인트 받기
-                    </CardTitle>
-                    <CardDescription className="text-indigo-200">
-                        짧은 광고 영상을 시청하고 즉시 포인트를 획득하세요. (하루 제한 없음)
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="relative z-10">
-                    <div className="bg-black/30 rounded-xl p-8 flex flex-col items-center justify-center border border-white/5">
-                        <p className="text-indigo-300 mb-6 text-center max-w-md">
-                            광고 시청 완료 시 <span className="text-yellow-400 font-bold">50P</span>가 즉시 지급됩니다.
-                            <br />
-                            (실제 서비스에서는 구글 애드센스 광고가 재생됩니다)
-                        </p>
-                        <Button 
-                            size="lg" 
-                            className="bg-yellow-500 hover:bg-yellow-400 text-black font-bold px-8 text-lg shadow-[0_0_20px_rgba(234,179,8,0.3)]"
-                            onClick={handleWatchAd}
-                            disabled={adLoading}
-                        >
-                            {adLoading ? (
-                                <>
-                                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                                    광고 로딩 중...
-                                </>
-                            ) : (
-                                <>
-                                    <PlayCircle className="mr-2 h-5 w-5" />
-                                    광고 시청하기 (+50P)
-                                </>
-                            )}
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
-        </section>
-
-        {/* 광고 배너 삽입 */}
-        <div className="mb-12">
-            <AdBanner dataAdSlot="1234567890" />
-        </div>
-
-        {/* 미션 영역 */}
-        <section>
-            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-                <Gift className="text-pink-500" />
-                도전 과제
-            </h2>
-            
-            {loading ? (
-                <div className="flex justify-center py-12">
-                    <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {missions.map((mission) => {
-                        const percent = Math.min(100, Math.floor((mission.current / mission.target) * 100))
-                        const isCompleted = mission.current >= mission.target
-                        const isClaimed = mission.claimed
-
-                        return (
-                            <Card 
-                                key={mission.id} 
-                                className={`border-white/10 transition-all duration-300 ${
-                                    isClaimed 
-                                        ? 'bg-black/40 opacity-70' 
-                                        : isCompleted 
-                                            ? 'bg-gradient-to-br from-emerald-900/40 to-teal-900/40 border-emerald-500/50 shadow-[0_0_30px_rgba(16,185,129,0.1)]' 
-                                            : 'bg-[#12141a]'
-                                }`}
-                            >
-                                <CardHeader>
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <CardTitle className={`text-xl mb-2 ${isCompleted && !isClaimed ? 'text-emerald-400' : 'text-white'}`}>
-                                                {mission.title}
-                                            </CardTitle>
-                                            <CardDescription className="text-slate-400">
-                                                {mission.description}
-                                            </CardDescription>
-                                        </div>
-                                        <div className="bg-white/5 px-3 py-1 rounded-full border border-white/10 text-yellow-400 font-bold text-sm">
-                                            +{mission.reward}P
-                                        </div>
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between text-sm">
-                                            <span className={isCompleted ? 'text-emerald-400 font-bold' : 'text-slate-400'}>
-                                                {isCompleted ? '달성 완료!' : '진행 중'}
-                                            </span>
-                                            <span className="text-white font-mono">
-                                                {mission.current} / {mission.target} {mission.unit}
-                                            </span>
-                                        </div>
-                                        <Progress 
-                                            value={percent} 
-                                            className="h-3 bg-black/50" 
-                                            indicatorClassName={
-                                                isClaimed 
-                                                    ? "bg-slate-600" 
-                                                    : isCompleted 
-                                                        ? "bg-gradient-to-r from-emerald-500 to-teal-400 animate-pulse" 
-                                                        : "bg-gradient-to-r from-violet-600 to-indigo-600"
-                                            }
-                                        />
-                                    </div>
-                                </CardContent>
-                                <CardFooter>
-                                    {isClaimed ? (
-                                        <Button disabled className="w-full bg-white/5 text-slate-500 border border-white/5">
-                                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                                            지급 완료
-                                        </Button>
-                                    ) : isCompleted ? (
-                                        <Button 
-                                            onClick={() => handleClaim(mission.id)}
-                                            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold shadow-[0_0_15px_rgba(16,185,129,0.4)] animate-pulse"
-                                        >
-                                            <Gift className="mr-2 h-4 w-4" />
-                                            보상 받기 (Click!)
-                                        </Button>
-                                    ) : (
-                                        <Button disabled className="w-full bg-white/5 text-slate-500 border border-white/5">
-                                            진행 중... {percent}%
-                                        </Button>
-                                    )}
-                                </CardFooter>
-                            </Card>
-                        )
-                    })}
-                </div>
-            )}
-        </section>
+      <div style={{ marginBottom: '32px' }}>
+        <ArcadeTicker
+          text="FREE PLAY MODE :: 광고 보고 코인 충전 :: 미션 클리어 보너스 지급 :: CONTINUE? 9... 8... 7..."
+          variant="accent"
+        />
       </div>
 
-      {/* 보상 획득 모달 */}
-      <Dialog open={showRewardModal} onOpenChange={setShowRewardModal}>
-        <DialogContent className="bg-[#1a1d24] border-white/10 text-white sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex flex-col items-center gap-4 pt-4">
-                <div className="w-16 h-16 rounded-full bg-yellow-500/20 flex items-center justify-center">
-                    <Gift className="w-8 h-8 text-yellow-500" />
-                </div>
-                <span className="text-2xl font-bold text-yellow-400">축하합니다!</span>
-            </DialogTitle>
-            <DialogDescription className="text-center text-slate-300 text-lg py-4">
-              {rewardMessage}
-              <br />
-              <span className="text-2xl font-bold text-white mt-2 block">+{rewardAmount} Point</span>
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="sm:justify-center">
-            <Button 
-                onClick={() => setShowRewardModal(false)}
-                className="bg-yellow-500 hover:bg-yellow-400 text-black font-bold px-8"
+      {/* 광고 영역 */}
+      <section style={{ marginBottom: '48px' }}>
+        <ArcadeBox variant="secondary" label="AD_PLAYER" isChunky>
+          <div style={{ padding: '8px 4px' }}>
+            <h2
+              className="arcade-font-pixel"
+              style={{ color: 'var(--arcade-secondary)', fontSize: '1rem', marginBottom: '10px' }}
             >
-              확인
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              WATCH_AD {'>'} GET_COIN
+            </h2>
+            <p style={{ color: '#fff', opacity: 0.8, marginBottom: '20px' }}>
+              짧은 광고 영상을 시청하고 즉시 포인트를 획득하세요. (하루 제한 없음)
+            </p>
+
+            <div
+              style={{
+                background: 'rgba(0,0,0,0.6)',
+                border: '2px dashed var(--arcade-secondary)',
+                padding: '32px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '20px',
+                textAlign: 'center',
+              }}
+            >
+              <p style={{ color: '#fff', opacity: 0.85 }}>
+                광고 시청 완료 시{' '}
+                <span style={{ color: 'var(--arcade-accent)', fontWeight: 900 }}>50P</span>가 즉시
+                지급됩니다.
+                <br />
+                <span style={{ fontSize: '0.85rem', opacity: 0.6 }}>
+                  (실제 서비스에서는 구글 애드센스 광고가 재생됩니다)
+                </span>
+              </p>
+              <ArcadeButton
+                variant="accent"
+                size="lg"
+                className={adLoading ? '' : 'coin-btn'}
+                onClick={handleWatchAd}
+                disabled={adLoading}
+              >
+                {adLoading ? (
+                  <span className="blink">NOW_LOADING... 광고 로딩 중</span>
+                ) : (
+                  <>▶ 광고 시청하기 (+50P)</>
+                )}
+              </ArcadeButton>
+            </div>
+          </div>
+        </ArcadeBox>
+      </section>
+
+      {/* 광고 배너 삽입 */}
+      <div style={{ marginBottom: '48px' }}>
+        <AdBanner dataAdSlot="1234567890" />
+      </div>
+
+      {/* 미션 영역 */}
+      <section>
+        <h2
+          className="arcade-font-pixel"
+          style={{ color: 'var(--arcade-accent)', fontSize: '1.1rem', marginBottom: '28px' }}
+        >
+          MISSION_BOARD
+        </h2>
+
+        {loading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '48px 0' }}>
+            <span
+              className="blink arcade-font-pixel"
+              style={{ color: 'var(--arcade-primary)', fontSize: '0.9rem' }}
+            >
+              LOADING_MISSIONS...
+            </span>
+          </div>
+        ) : (
+          <div className="arcade-grid">
+            {missions.map((mission) => {
+              const percent = Math.min(100, Math.floor((mission.current / mission.target) * 100))
+              const isCompleted = mission.current >= mission.target
+              const isClaimed = mission.claimed
+
+              const boxVariant = isClaimed ? 'default' : isCompleted ? 'accent' : 'primary'
+              const boxLabel = isClaimed ? 'STAGE_CLEAR' : isCompleted ? 'REWARD_READY' : 'IN_PROGRESS'
+
+              return (
+                <ArcadeBox
+                  key={mission.id}
+                  variant={boxVariant}
+                  label={boxLabel}
+                  isChunky
+                  className="kuji-card-arcade"
+                  style={isClaimed ? { opacity: 0.6 } : undefined}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                      <div>
+                        <h3
+                          style={{
+                            color: isCompleted && !isClaimed ? 'var(--arcade-accent)' : '#fff',
+                            fontWeight: 900,
+                            fontSize: '1.2rem',
+                            marginBottom: '8px',
+                          }}
+                        >
+                          {mission.title}
+                        </h3>
+                        <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem' }}>
+                          {mission.description}
+                        </p>
+                      </div>
+                      <span
+                        className="arcade-font-pixel"
+                        style={{
+                          color: 'var(--arcade-accent)',
+                          border: '2px solid var(--arcade-accent)',
+                          background: 'rgba(0,0,0,0.6)',
+                          padding: '6px 10px',
+                          fontSize: '0.6rem',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        +{mission.reward}P
+                      </span>
+                    </div>
+
+                    {/* 진행도 바 */}
+                    <div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          marginBottom: '8px',
+                          fontSize: '0.85rem',
+                        }}
+                      >
+                        <span
+                          className={isCompleted && !isClaimed ? 'blink' : undefined}
+                          style={{
+                            color: isCompleted ? 'var(--arcade-accent)' : 'rgba(255,255,255,0.6)',
+                            fontWeight: isCompleted ? 900 : 500,
+                          }}
+                        >
+                          {isCompleted ? '달성 완료!' : '진행 중'}
+                        </span>
+                        <span style={{ color: '#fff', fontFamily: 'monospace' }}>
+                          {mission.current} / {mission.target} {mission.unit}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          height: '18px',
+                          background: '#000',
+                          border: '3px solid var(--arcade-border)',
+                          padding: '2px',
+                          imageRendering: 'pixelated',
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${percent}%`,
+                            height: '100%',
+                            background: isClaimed
+                              ? 'rgba(255,255,255,0.25)'
+                              : isCompleted
+                                ? 'var(--arcade-accent)'
+                                : 'var(--arcade-primary)',
+                            backgroundImage:
+                              'repeating-linear-gradient(90deg, rgba(0,0,0,0.25) 0 4px, transparent 4px 8px)',
+                            transition: 'width 0.3s steps(10)',
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* 액션 버튼 */}
+                    <div style={{ display: 'flex' }}>
+                      {isClaimed ? (
+                        <ArcadeButton variant="secondary" size="sm" disabled style={{ width: '100%', opacity: 0.5 }}>
+                          ✔ 지급 완료
+                        </ArcadeButton>
+                      ) : isCompleted ? (
+                        <ArcadeButton
+                          variant="accent"
+                          size="md"
+                          className="coin-btn"
+                          style={{ width: '100%' }}
+                          onClick={() => handleClaim(mission.id)}
+                        >
+                          ★ 보상 받기 (PRESS_START)
+                        </ArcadeButton>
+                      ) : (
+                        <ArcadeButton variant="secondary" size="sm" disabled style={{ width: '100%', opacity: 0.5 }}>
+                          진행 중... {percent}%
+                        </ArcadeButton>
+                      )}
+                    </div>
+                  </div>
+                </ArcadeBox>
+              )
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* 보상 획득 모달 */}
+      {showRewardModal && (
+        <div
+          onClick={() => setShowRewardModal(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.8)',
+            zIndex: 2000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+          }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '420px' }} className="animate-in">
+            <ArcadeBox variant="accent" label="REWARD_GET" isChunky>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '16px',
+                  padding: '16px 8px',
+                  textAlign: 'center',
+                }}
+              >
+                <div className="arcade-font-pixel blink" style={{ color: 'var(--arcade-accent)', fontSize: '1.1rem' }}>
+                  CONGRATULATIONS!
+                </div>
+                <p style={{ color: '#fff', opacity: 0.85 }}>{rewardMessage}</p>
+                <div
+                  className="arcade-font-pixel"
+                  style={{ color: 'var(--arcade-secondary)', fontSize: '1.3rem', textShadow: '3px 3px 0 #000' }}
+                >
+                  +{rewardAmount} POINT
+                </div>
+                <ArcadeButton variant="accent" size="md" onClick={() => setShowRewardModal(false)}>
+                  확인 (OK)
+                </ArcadeButton>
+              </div>
+            </ArcadeBox>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
-

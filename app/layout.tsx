@@ -8,7 +8,7 @@ import ArcadeShell from '@/components/layout/ArcadeShell'
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://dopamine-ground.vercel.app'),
-  title: 'KUJIHUB | 쿠지허브',
+  title: 'DOPAMINE.LAND',
   description: '지금 접속하면 100포인트 무료! 실시간 랭킹 1위에 도전하세요.',
   icons: {
     icon: [
@@ -18,10 +18,10 @@ export const metadata: Metadata = {
     apple: '/arcade-icon.svg',
   },
   openGraph: {
-    title: 'KUJIHUB | 쿠지허브',
+    title: 'DOPAMINE.LAND',
     description: '지금 접속하면 100포인트 무료! 실시간 랭킹 1위에 도전하세요.',
     url: 'https://dopamine-ground.vercel.app',
-    siteName: 'KUJIHUB',
+    siteName: 'DOPAMINE.LAND',
     images: [
       {
         url: '/images/og-default.png',

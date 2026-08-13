@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verifyToken } from '@/lib/auth'
 
-// 게시글 목록 조회
-export async function GET() {
+// 게시글 목록 조회 (?category= 로 커뮤니티 카테고리 필터)
+export async function GET(request: NextRequest) {
   try {
+    const category = request.nextUrl.searchParams.get('category')
     const posts = await prisma.post.findMany({
+      where: category ? { category } : undefined,
       include: {
         author: {
           select: {
@@ -15,9 +17,7 @@ export async function GET() {
           },
         },
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: [{ isNotice: 'desc' }, { createdAt: 'desc' }],
     })
 
     const formattedPosts = posts.map((post) => ({
@@ -27,6 +27,8 @@ export async function GET() {
       creation_date: post.createdAt.toISOString(),
       contents: post.content,
       views: post.views,
+      category: post.category,
+      is_notice: post.isNotice,
     }))
 
     return NextResponse.json(formattedPosts, { status: 200 })
@@ -61,7 +63,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { title, contents } = body
+    const { title, contents, category, isNotice } = body
 
     if (!title || !contents) {
       return NextResponse.json(
@@ -111,11 +113,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // 공지는 관리자만 작성 가능
+    const asNotice = isNotice === true && user.userType === 1
+    const allowedCategories = ['자유', '공지', '정보', '질문']
+    const postCategory = asNotice
+      ? '공지'
+      : allowedCategories.includes(category)
+        ? category
+        : '자유'
+
     // 게시글 작성
     const post = await prisma.post.create({
       data: {
         title: sanitizedTitle,
         content: sanitizedContents,
+        category: postCategory,
+        isNotice: asNotice,
         authorId: payload.userId,
       },
       include: {

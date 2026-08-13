@@ -41,6 +41,8 @@ model Post {
   id        Int       @id @default(autoincrement())
   title     String
   content   String   @db.Text
+  category  String    @default("자유") // 커뮤니티 카테고리 (kujihub community 통합)
+  isNotice  Boolean   @default(false)  // 공지 여부 (기존 notice 게시판 흡수)
   authorId  Int
   author    User      @relation(fields: [authorId], references: [id])
   createdAt DateTime  @default(now())
@@ -48,6 +50,9 @@ model Post {
   comments  Comment[]
   likes     Like[]    // 좋아요 받은 기록
   views     Int       @default(0) // 조회수
+
+  @@index([category])
+  @@index([isNotice])
 }
 
 model Like {
