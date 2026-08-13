@@ -87,7 +87,7 @@
 /* Utility Classes */
 /* Specific Arcade Font for Menu and Landing titles */
 .arcade-font-pixel {
-  font-family: 'Press Start 2P', cursive !important;
+  font-family: 'Press Start 2P', 'Galmuri11', cursive !important;
 }
 
 .glitch-text {

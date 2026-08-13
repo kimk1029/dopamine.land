@@ -342,7 +342,7 @@ export default function ChargePage() {
                         >
                           {isCompleted ? '달성 완료!' : '진행 중'}
                         </span>
-                        <span style={{ color: '#fff', fontFamily: 'monospace' }}>
+                        <span style={{ color: '#fff', fontFamily: "'Galmuri11', monospace" }}>
                           {mission.current} / {mission.target} {mission.unit}
                         </span>
                       </div>

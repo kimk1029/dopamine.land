@@ -353,7 +353,7 @@ const GameComponent = ({ quality, onGameOver }: GameComponentProps) => {
                     }
 
                     this.scoreText = this.add.text(20, 20, 'SCORE: 0', {
-                        fontSize: '24px', fontFamily: 'monospace', color: '#0ea5e9', fontStyle: 'bold',
+                        fontSize: '24px', fontFamily: "'Galmuri11', monospace", color: '#0ea5e9', fontStyle: 'bold',
                     }).setDepth(10);
 
                     this.gameOverText = this.add.text(400, 250, 'GAME OVER', {

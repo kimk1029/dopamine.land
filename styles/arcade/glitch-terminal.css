@@ -1,7 +1,7 @@
 /* Glitch Terminal (Stitch) design system — pure CSS */
 
 .gt-page {
-  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-family: 'Space Grotesk', 'Galmuri11', system-ui, sans-serif;
   color: var(--gt-on-surface);
   background: var(--gt-bg);
   min-height: 100vh;
@@ -39,7 +39,7 @@
 
 /* Headings */
 .gt-h1 {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Space Grotesk', 'Galmuri11', sans-serif;
   font-weight: 900;
   font-style: italic;
   text-transform: uppercase;
@@ -50,7 +50,7 @@
 }
 
 .gt-h2 {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Space Grotesk', 'Galmuri11', sans-serif;
   font-weight: 900;
   font-style: italic;
   text-transform: uppercase;
@@ -60,7 +60,7 @@
 }
 
 .gt-mono {
-  font-family: 'Space Grotesk', 'VT323', monospace;
+  font-family: 'Space Grotesk', 'Galmuri11', 'VT323', monospace;
 }
 
 /* Section header with badge block */
@@ -167,7 +167,7 @@
 }
 
 .gt-hero-title {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Space Grotesk', 'Galmuri11', sans-serif;
   font-size: clamp(2.2rem, 6vw, 4.5rem);
   font-weight: 900;
   font-style: italic;
@@ -184,7 +184,7 @@
   background: rgba(0, 0, 0, 0.7);
   color: var(--gt-secondary);
   padding: 8px 12px;
-  font-family: 'Space Grotesk', monospace;
+  font-family: 'Space Grotesk', 'Galmuri11', monospace;
   font-size: 0.78rem;
   line-height: 1.5;
 }
@@ -384,7 +384,7 @@
   flex-wrap: wrap;
   gap: 12px;
   font-size: 0.7rem;
-  font-family: 'Space Grotesk', monospace;
+  font-family: 'Space Grotesk', 'Galmuri11', monospace;
   color: var(--gt-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -438,7 +438,7 @@
 .gt-page-sub {
   font-size: 0.8rem;
   color: var(--gt-on-surface-variant);
-  font-family: 'Space Grotesk', monospace;
+  font-family: 'Space Grotesk', 'Galmuri11', monospace;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -556,7 +556,7 @@
 }
 .gt-chip.mono {
   color: var(--gt-secondary);
-  font-family: 'Space Grotesk', monospace;
+  font-family: 'Space Grotesk', 'Galmuri11', monospace;
   border-color: transparent;
   background: transparent;
 }
@@ -615,7 +615,7 @@
   padding: 14px 18px;
   background: var(--gt-primary);
   color: var(--gt-on-primary);
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Space Grotesk', 'Galmuri11', sans-serif;
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -973,7 +973,7 @@
 
 .gt-profile-sub {
   font-size: 0.7rem;
-  font-family: 'Space Grotesk', monospace;
+  font-family: 'Space Grotesk', 'Galmuri11', monospace;
   color: var(--gt-on-surface-variant);
   text-transform: uppercase;
   opacity: 0.8;
@@ -1080,7 +1080,7 @@
   min-height: 100vh;
   background: var(--gt-bg);
   color: var(--gt-on-surface);
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Space Grotesk', 'Galmuri11', sans-serif;
   position: relative;
   overflow: hidden;
 }
@@ -1141,7 +1141,7 @@
   font-style: normal;
   font-size: 0.52rem;
   color: var(--gt-on-surface-variant);
-  font-family: 'Space Grotesk', monospace;
+  font-family: 'Space Grotesk', 'Galmuri11', monospace;
 }
 
 .gt-entry-logo {
@@ -1149,7 +1149,7 @@
   margin-bottom: 64px;
 }
 .gt-entry-logo h1 {
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Space Grotesk', 'Galmuri11', sans-serif;
   font-size: clamp(3rem, 12vw, 5.5rem);
   font-weight: 900;
   font-style: italic;
@@ -1239,7 +1239,7 @@
   font-weight: 900;
   font-size: 1.1rem;
   letter-spacing: -0.02em;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Space Grotesk', 'Galmuri11', sans-serif;
 }
 .gt-entry-init:active .face {
   transform: translate(5px, 5px);
@@ -1261,7 +1261,7 @@
   font-size: 0.72rem;
   letter-spacing: 0.08em;
   cursor: pointer;
-  font-family: 'Space Grotesk', sans-serif;
+  font-family: 'Space Grotesk', 'Galmuri11', sans-serif;
   transition: background 0.2s;
 }
 .gt-entry-login-btn:hover { background: var(--gt-surface-bright); }
@@ -1337,7 +1337,7 @@
   font-weight: 700;
   letter-spacing: 0.1em;
   color: var(--gt-on-surface-variant);
-  font-family: 'Space Grotesk', monospace;
+  font-family: 'Space Grotesk', 'Galmuri11', monospace;
   margin-bottom: 6px;
 }
 
@@ -1362,7 +1362,7 @@
   border: none;
   outline: none;
   color: var(--gt-secondary);
-  font-family: 'Space Grotesk', monospace;
+  font-family: 'Space Grotesk', 'Galmuri11', monospace;
   font-size: 1.5rem;
   font-weight: 900;
   text-align: right;
@@ -1410,7 +1410,7 @@
   font-weight: 700;
   color: var(--gt-on-surface-variant);
   margin-left: 10px;
-  font-family: 'Space Grotesk', monospace;
+  font-family: 'Space Grotesk', 'Galmuri11', monospace;
 }
 
 .gt-calc-bar {
@@ -1478,7 +1478,7 @@
   align-items: center;
   min-height: 40vh;
   color: var(--gt-primary);
-  font-family: 'Space Grotesk', monospace;
+  font-family: 'Space Grotesk', 'Galmuri11', monospace;
   font-weight: 900;
   letter-spacing: 0.1em;
 }

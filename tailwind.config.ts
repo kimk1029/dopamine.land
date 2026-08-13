@@ -18,6 +18,12 @@ const config = {
       },
     },
     extend: {
+      /* 한글은 어디서나 갈무리체로: Tailwind font-sans/font-mono가 시스템 폰트로
+         떨어지지 않도록 Galmuri11을 최우선으로 둔다. */
+      fontFamily: {
+        sans: ["Galmuri11", "VT323", "monospace"],
+        mono: ["Galmuri11", "VT323", "monospace"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

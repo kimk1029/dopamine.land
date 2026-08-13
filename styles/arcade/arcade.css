@@ -133,7 +133,7 @@
   text-shadow: 6px 6px 0px var(--arcade-secondary);
   line-height: 1;
   font-weight: 900;
-  font-family: 'Press Start 2P', cursive !important;
+  font-family: 'Press Start 2P', 'Galmuri11', cursive !important;
   margin-bottom: 2rem;
 }
 
@@ -141,7 +141,7 @@
   margin-top: 1.5rem;
   color: var(--arcade-accent);
   font-weight: 900;
-  font-family: 'Press Start 2P', cursive !important;
+  font-family: 'Press Start 2P', 'Galmuri11', cursive !important;
 }
 
 /* Arcade Grid Layout */
@@ -716,7 +716,7 @@
 .bulletin-header {
   background: var(--arcade-primary);
   color: #000;
-  font-family: 'Press Start 2P', cursive;
+  font-family: 'Press Start 2P', 'Galmuri11', cursive;
   font-size: 0.7rem;
   font-weight: 900;
 }
