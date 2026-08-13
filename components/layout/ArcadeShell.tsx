@@ -44,7 +44,7 @@ const KUJIHUB_ITEMS: NavItem[] = [
 ]
 
 /**
- * test-board-app 이 원래 갖고 있던 메뉴. 쿠지허브 레이아웃 안에서
+ * dopamine.land 이 원래 갖고 있던 메뉴. 쿠지허브 레이아웃 안에서
  * 서브 메뉴 그룹으로 들어간다. `/arcade` 는 옮기기 전 이 앱의 첫 화면.
  */
 const ARCADE_ITEMS: NavItem[] = [

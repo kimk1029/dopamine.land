@@ -2,7 +2,7 @@
  * kujihub web(index.css)의 전역 리셋 부분.
  *
  * 원본은 SPA 단독 실행 전제라 `*`, `body`, `h1..h6`, `button` 같은 요소
- * 선택자를 그대로 덮어쓴다. 여기서는 test-board-app의 기존 32개 페이지
+ * 선택자를 그대로 덮어쓴다. 여기서는 dopamine.land의 기존 32개 페이지
  * (게임·보드·심리테스트)가 Tailwind/shadcn 스타일을 유지해야 하므로
  * `.kujihub-scope` 아래로 한정한다. 쿠지허브에서 옮겨온 라우트만 이
  * 클래스를 단다.

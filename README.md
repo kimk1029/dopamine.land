@@ -89,7 +89,7 @@ npm run dev
 ## 프로젝트 구조
 
 ```
-test-board-app/
+dopamine.land/
 ├── app/                    # Next.js App Router
 │   ├── api/               # API Routes
 │   │   ├── auth/         # 인증 API

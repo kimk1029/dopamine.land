@@ -3,7 +3,7 @@
 Next.js App Router 방식으로 구성된 프로젝트 구조입니다.
 
 ```
-test-board-app/
+dopamine.land/
 ├── app/                          # Next.js App Router
 │   ├── api/                      # API Routes
 │   │   ├── auth/                 # 인증 API
