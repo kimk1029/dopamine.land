@@ -229,6 +229,8 @@ export async function POST(request: NextRequest) {
         }
       })
       
+      // 히스토리에서 몇 배에서 터졌는지 보이도록 크래시 배율을 기록한다.
+      const crashedAt = (gameSession.gameData as any)?.crashPoint ?? 0
       await prisma.gameLog.create({
         data: {
           userId: payload.userId,
@@ -237,7 +239,7 @@ export async function POST(request: NextRequest) {
           payout: 0,
           profit: -gameSession.betAmount,
           result: 'LOSE',
-          multiplier: 0,
+          multiplier: crashedAt,
         }
       })
       

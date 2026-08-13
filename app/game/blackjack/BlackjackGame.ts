@@ -23,7 +23,20 @@ interface Chip {
   x: number
   y: number
   element: HTMLImageElement | null
+  label?: string
 }
+
+// 아케이드 픽셀 팔레트 / 폰트
+const FONT_PIXEL = "'Press Start 2P', 'Galmuri11', monospace"
+const FONT_KR = "'Galmuri11', monospace"
+const C_BG = '#0a0a1a'
+const C_SURFACE = '#1a1a2e'
+const C_MAGENTA = '#ff00ff'
+const C_CYAN = '#00ffff'
+const C_LIME = '#39ff14'
+const C_YELLOW = '#ffe600'
+const C_LOSE = '#ff3366'
+const C_GRAY = '#9ca3af'
 
 interface Button {
   x: number
@@ -65,8 +78,6 @@ export class BlackjackGame {
   private staticCtx: CanvasRenderingContext2D | null = null
 
   private cardImages: Map<string, HTMLImageElement> = new Map()
-  private cardBackImage: HTMLImageElement | null = null
-  private tableImage: HTMLImageElement | null = null
   private imagesLoaded: number = 0
   private totalImages: number = 0
 
@@ -168,6 +179,8 @@ export class BlackjackGame {
     this.canvasHeight = height
     this.canvas.width = width
     this.canvas.height = height
+    // 픽셀 아트: 스무딩 비활성화 (canvas 크기 변경 시 컨텍스트 상태가 초기화되므로 매번 재설정)
+    this.ctx.imageSmoothingEnabled = false
 
     this.isMobile = width < 768
 
@@ -311,13 +324,8 @@ export class BlackjackGame {
     }
 
     const chipRadius = (this.isMobile ? 30 : 35) * this.scaleFactor * 1.3
-    for (const chip of this.chipButtons) {
-      const dist = Math.hypot(x - chip.x, y - chip.y)
-      if (dist <= chipRadius) return 'pointer'
-    }
-
     if (this.gameState === GameState.BETTING) {
-      for (const chip of this.betChips) {
+      for (const chip of [...this.chipButtons, ...this.betChips]) {
         const dist = Math.hypot(x - chip.x, y - chip.y)
         if (dist <= chipRadius) return 'pointer'
       }
@@ -343,11 +351,15 @@ export class BlackjackGame {
     }
 
     const chipRadius = (this.isMobile ? 30 : 35) * this.scaleFactor * 1.3
-    for (const chip of this.chipButtons) {
-      const dist = Math.hypot(x - chip.x, y - chip.y)
-      if (dist <= chipRadius) {
-        this.addChipToTable(chip.amount)
-        return
+    // 칩 추가/제거는 베팅 상태에서만 허용 (라운드 중 베팅 변경 방지)
+    if (this.gameState === GameState.BETTING) {
+      for (const chip of this.chipButtons) {
+        const dist = Math.hypot(x - chip.x, y - chip.y)
+        if (dist <= chipRadius) {
+          const amount = chip.amount < 0 ? Math.floor(this.playerPoints) : chip.amount
+          if (amount > 0) this.addChipToTable(amount)
+          return
+        }
       }
     }
 
@@ -364,17 +376,11 @@ export class BlackjackGame {
   }
 
   private async loadImages() {
-    this.tableImage = await this.loadImage('https://images.unsplash.com/photo-1614294148950-1f23c7153a1e?w=800&q=80').catch(
-      () => null
-    )
-
-    this.cardBackImage = await this.loadImage('https://deckofcardsapi.com/static/img/back.png')
-
     const suits = ['hearts', 'diamonds', 'clubs', 'spades']
     const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
     const suitMap: Record<string, string> = { hearts: 'H', diamonds: 'D', clubs: 'C', spades: 'S' }
 
-    this.totalImages = suits.length * values.length + 2
+    this.totalImages = suits.length * values.length
     this.imagesLoaded = 0
 
     const promises: Promise<any>[] = []
@@ -387,37 +393,16 @@ export class BlackjackGame {
         const url = `https://deckofcardsapi.com/static/img/${valueCode}${suitCode}.png`
 
         promises.push(
-          this.loadImage(url).then((img) => {
-            this.cardImages.set(cardKey, img)
-            this.updateLoadingProgress()
-          })
+          this.loadImage(url)
+            .then((img) => {
+              this.cardImages.set(cardKey, img)
+              this.updateLoadingProgress()
+            })
+            // 이미지 로드 실패 시에도 진행 (픽셀 카드 폴백 렌더링 사용)
+            .catch(() => this.updateLoadingProgress())
         )
       }
     }
-
-    promises.push(
-      this.loadImage('https://images.unsplash.com/photo-1614294148950-1f23c7153a1e?w=800&q=80')
-        .then((img) => {
-          this.tableImage = img
-          this.updateLoadingProgress()
-        })
-        .catch(() => {
-          this.tableImage = null
-          this.updateLoadingProgress()
-        })
-    )
-
-    promises.push(
-      this.loadImage('https://deckofcardsapi.com/static/img/back.png')
-        .then((img) => {
-          this.cardBackImage = img
-          this.updateLoadingProgress()
-        })
-        .catch(() => {
-          this.updateLoadingProgress()
-          return null
-        })
-    )
 
     await Promise.all(promises)
 
@@ -433,34 +418,28 @@ export class BlackjackGame {
     if (!this.staticCtx) return
 
     const ctx = this.staticCtx
+    ctx.imageSmoothingEnabled = false
 
-    ctx.fillStyle = '#0a3d20'
+    ctx.fillStyle = C_BG
     ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight)
 
-    if (this.tableImage) {
-      ctx.drawImage(this.tableImage, 0, 0, this.gameAreaWidth, this.canvasHeight)
-    } else {
-      this.drawTablePattern(ctx)
-    }
+    this.drawTablePattern(ctx)
 
     if (this.sidebarWidth > 0) {
       const sx = this.gameAreaWidth
       const w = this.sidebarWidth
 
-      ctx.fillStyle = '#1e293b'
+      ctx.fillStyle = '#050510'
       ctx.fillRect(sx, 0, w, this.canvasHeight)
 
-      ctx.strokeStyle = '#334155'
-      ctx.lineWidth = 2
-      ctx.beginPath()
-      ctx.moveTo(sx, 0)
-      ctx.lineTo(sx, this.canvasHeight)
-      ctx.stroke()
+      // 픽셀 구분선 (4px)
+      ctx.fillStyle = C_MAGENTA
+      ctx.fillRect(sx, 0, 4, this.canvasHeight)
 
-      ctx.fillStyle = '#94a3b8'
-      ctx.font = 'bold 20px sans-serif'
+      ctx.fillStyle = C_CYAN
+      ctx.font = `12px ${FONT_PIXEL}`
       ctx.textAlign = 'left'
-      ctx.fillText('HISTORY', sx + 20, 40)
+      ctx.fillText('SESSION_LOG', sx + 20, 40)
     }
   }
 
@@ -579,12 +558,19 @@ export class BlackjackGame {
   }
 
   private createChipButtons() {
-    const betAmounts = [1, 5, 10, 50, 100]
-    const spacing = this.isMobile ? this.gameAreaWidth * 0.16 : this.gameAreaWidth * 0.12
-    const startX = this.chipTrayPosition.x - ((betAmounts.length - 1) * spacing) / 2
+    // 포인트 베팅 선택지: +100 / +500 / +1000 / MAX (amount -1 = 잔여 포인트 전부)
+    const betOptions: Array<{ amount: number; label?: string }> = [
+      { amount: 100 },
+      { amount: 500 },
+      { amount: 1000 },
+      { amount: -1, label: 'MAX' },
+    ]
+    const spacing = this.isMobile ? this.gameAreaWidth * 0.2 : this.gameAreaWidth * 0.12
+    const startX = this.chipTrayPosition.x - ((betOptions.length - 1) * spacing) / 2
 
-    this.chipButtons = betAmounts.map((amount, index) => ({
-      amount,
+    this.chipButtons = betOptions.map((opt, index) => ({
+      amount: opt.amount,
+      label: opt.label,
       x: startX + index * spacing,
       y: this.chipTrayPosition.y,
       element: null,
@@ -614,7 +600,7 @@ export class BlackjackGame {
   }
 
   private addChipToTable(amount: number) {
-    if (this.playerPoints < amount) return
+    if (amount <= 0 || this.playerPoints < amount) return
 
     const chipCount = this.betChips.length
     const jitterX = (Math.random() - 0.5) * 5
@@ -627,7 +613,8 @@ export class BlackjackGame {
       element: null,
     }
 
-    const startChip = this.chipButtons.find((c) => c.amount === amount)
+    const startChip =
+      this.chipButtons.find((c) => c.amount === amount) ?? this.chipButtons.find((c) => c.amount < 0)
 
     this.animations.push({
       type: 'chip',
@@ -1498,10 +1485,9 @@ export class BlackjackGame {
 
     if (this.staticCanvas) this.ctx.drawImage(this.staticCanvas, 0, 0)
     else {
-      this.ctx.fillStyle = '#0a3d20'
+      this.ctx.fillStyle = C_BG
       this.ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight)
-      if (this.tableImage) this.ctx.drawImage(this.tableImage, 0, 0, this.gameAreaWidth, this.canvasHeight)
-      else this.drawTablePattern()
+      this.drawTablePattern()
     }
 
     this.renderGameElements()
@@ -1513,31 +1499,55 @@ export class BlackjackGame {
 
   private drawTablePattern(targetCtx?: CanvasRenderingContext2D) {
     const ctx = targetCtx || this.ctx
-    ctx.strokeStyle = 'rgba(255, 215, 0, 0.2)'
+
+    // 아케이드 픽셀 그리드 배경
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)'
+    ctx.lineWidth = 1
+    for (let gx = 0; gx <= this.gameAreaWidth; gx += 40) {
+      ctx.beginPath()
+      ctx.moveTo(gx + 0.5, 0)
+      ctx.lineTo(gx + 0.5, this.canvasHeight)
+      ctx.stroke()
+    }
+    for (let gy = 0; gy <= this.canvasHeight; gy += 40) {
+      ctx.beginPath()
+      ctx.moveTo(0, gy + 0.5)
+      ctx.lineTo(this.gameAreaWidth, gy + 0.5)
+      ctx.stroke()
+    }
+
+    ctx.strokeStyle = 'rgba(0, 255, 255, 0.15)'
     ctx.lineWidth = 3 * this.scaleFactor
     ctx.beginPath()
     ctx.arc(this.gameAreaWidth / 2, -400 * this.scaleFactor, 1000 * this.scaleFactor, 0, Math.PI, false)
     ctx.stroke()
 
-    ctx.fillStyle = 'rgba(255, 215, 0, 0.1)'
-    ctx.font = `bold ${40 * this.scaleFactor}px serif`
+    ctx.fillStyle = 'rgba(255, 0, 255, 0.25)'
+    ctx.font = `${20 * this.scaleFactor}px ${FONT_PIXEL}`
     ctx.textAlign = 'center'
     ctx.fillText('BLACKJACK PAYS 3 TO 2', this.gameAreaWidth / 2, this.canvasHeight * 0.4)
-    ctx.font = `${20 * this.scaleFactor}px serif`
-    ctx.fillText('Dealer must stand on 17 and draw to 16', this.gameAreaWidth / 2, this.canvasHeight * 0.45)
+    ctx.fillStyle = 'rgba(0, 255, 255, 0.25)'
+    ctx.font = `${10 * this.scaleFactor}px ${FONT_PIXEL}`
+    ctx.fillText('DEALER MUST STAND ON 17 AND DRAW TO 16', this.gameAreaWidth / 2, this.canvasHeight * 0.45)
   }
 
   private renderGameElements() {
     this.renderDeck()
 
-    // 포인트 표시
-    this.ctx.fillStyle = '#ffffff'
-    this.ctx.font = `bold ${18 * this.scaleFactor}px Arial`
+    // 포인트/베팅 표시 (현재 잔액)
+    this.ctx.fillStyle = C_YELLOW
+    this.ctx.font = `${12 * this.scaleFactor}px ${FONT_PIXEL}`
     this.ctx.textAlign = 'left'
-    this.ctx.fillText(`Points: ${this.playerPoints.toLocaleString()}`, 20, 30)
+    this.ctx.fillText(`POINTS ${Math.floor(this.playerPoints).toLocaleString()}`, 20, 30)
+
+    if (this.currentBet > 0 || this.gameState === GameState.BETTING) {
+      this.ctx.fillStyle = C_CYAN
+      this.ctx.font = `${10 * this.scaleFactor}px ${FONT_PIXEL}`
+      this.ctx.fillText(`BET ${this.currentBet.toLocaleString()}`, 20, 54)
+    }
 
     this.ctx.fillStyle = '#ffffff'
-    this.ctx.font = `bold ${20 * this.scaleFactor}px Arial`
+    this.ctx.font = `${13 * this.scaleFactor}px ${FONT_PIXEL}`
     this.ctx.textAlign = 'center'
 
     // ✅ 점수 텍스트 위치를 카드 기준으로 재배치 (겹침 방지)
@@ -1571,13 +1581,77 @@ export class BlackjackGame {
     const h = 120 * this.scaleFactor
     const { x, y } = this.deckPosition
 
-    for (let i = 0; i < 5; i++) {
-      this.ctx.fillStyle = '#ccc'
-      this.ctx.fillRect(x - w / 2 - i, y - h / 2 - i, w, h)
-      this.ctx.strokeStyle = '#999'
-      this.ctx.strokeRect(x - w / 2 - i, y - h / 2 - i, w, h)
+    // 픽셀 카드 뒷면 스택
+    for (let i = 4; i >= 0; i--) {
+      this.drawPixelCardBack(x - w / 2 - i, y - h / 2 - i, w, h, i === 0)
     }
-    if (this.cardBackImage) this.ctx.drawImage(this.cardBackImage, x - w / 2 - 5, y - h / 2 - 5, w, h)
+  }
+
+  // 픽셀 스타일 카드 뒷면 (좌상단 기준)
+  private drawPixelCardBack(x: number, y: number, w: number, h: number, withPattern: boolean = true) {
+    this.ctx.save()
+
+    // 하드 오프셋 섀도우
+    this.ctx.fillStyle = '#000000'
+    this.ctx.fillRect(x + 4, y + 4, w, h)
+
+    this.ctx.fillStyle = C_SURFACE
+    this.ctx.fillRect(x, y, w, h)
+
+    if (withPattern) {
+      this.ctx.strokeStyle = C_MAGENTA
+      this.ctx.lineWidth = 2
+      this.ctx.strokeRect(x + w * 0.15, y + h * 0.12, w * 0.7, h * 0.76)
+
+      this.ctx.fillStyle = C_MAGENTA
+      this.ctx.font = `${Math.round(h * 0.2)}px ${FONT_PIXEL}`
+      this.ctx.textAlign = 'center'
+      this.ctx.textBaseline = 'middle'
+      this.ctx.fillText('?', x + w / 2, y + h / 2)
+    }
+
+    // 청키 블랙 보더
+    this.ctx.strokeStyle = '#000000'
+    this.ctx.lineWidth = 3
+    this.ctx.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3)
+
+    this.ctx.restore()
+  }
+
+  // 픽셀 스타일 카드 앞면 (중심 원점 기준: renderCards의 translate 이후 호출)
+  private drawPixelCardFace(card: Card, w: number, h: number) {
+    const x = -w / 2
+    const y = -h / 2
+
+    // 하드 오프셋 섀도우
+    this.ctx.fillStyle = '#000000'
+    this.ctx.fillRect(x + 4, y + 4, w, h)
+
+    // 흰색 카드면 (이미지의 둥근 모서리를 사각으로 채움)
+    this.ctx.fillStyle = '#ffffff'
+    this.ctx.fillRect(x, y, w, h)
+
+    const img = this.cardImages.get(`card-${card.suit}-${card.value}`)
+    if (img) {
+      this.ctx.drawImage(img, x + 2, y + 2, w - 4, h - 4)
+    } else {
+      // 이미지 로드 실패 폴백: 흰 바탕 + 검정/빨강 핍 직접 렌더
+      const isRed = card.suit === 'hearts' || card.suit === 'diamonds'
+      const suitChar = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠' }[card.suit] || '?'
+      this.ctx.fillStyle = isRed ? '#d40000' : '#000000'
+      this.ctx.textBaseline = 'middle'
+      this.ctx.textAlign = 'left'
+      this.ctx.font = `${Math.round(h * 0.13)}px ${FONT_PIXEL}`
+      this.ctx.fillText(String(card.value), x + w * 0.1, y + h * 0.16)
+      this.ctx.textAlign = 'center'
+      this.ctx.font = `${Math.round(h * 0.32)}px ${FONT_KR}`
+      this.ctx.fillText(suitChar, 0, h * 0.08)
+    }
+
+    // 청키 블랙 보더
+    this.ctx.strokeStyle = '#000000'
+    this.ctx.lineWidth = 3
+    this.ctx.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3)
   }
 
   private renderCards() {
@@ -1607,21 +1681,9 @@ export class BlackjackGame {
       this.ctx.shadowBlur = 0
 
       if (isFaceUp) {
-        const key = `card-${card.suit}-${card.value}`
-        const img = this.cardImages.get(key)
-        if (img) this.ctx.drawImage(img, -w / 2, -h / 2, w, h)
-        else {
-          this.ctx.fillStyle = 'white'
-          this.ctx.fillRect(-w / 2, -h / 2, w, h)
-          this.ctx.fillStyle = 'black'
-          this.ctx.fillText(String(card.value), 0, 0)
-        }
+        this.drawPixelCardFace(card, w, h)
       } else {
-        if (this.cardBackImage) this.ctx.drawImage(this.cardBackImage, -w / 2, -h / 2, w, h)
-        else {
-          this.ctx.fillStyle = 'red'
-          this.ctx.fillRect(-w / 2, -h / 2, w, h)
-        }
+        this.drawPixelCardBack(-w / 2, -h / 2, w, h)
       }
 
       this.ctx.restore()
@@ -1629,63 +1691,51 @@ export class BlackjackGame {
   }
 
   private renderChips() {
-    this.chipButtons.forEach((chip) => this.drawFancyChip(chip.x, chip.y, chip.amount))
+    this.chipButtons.forEach((chip) => this.drawFancyChip(chip.x, chip.y, chip.amount, chip.label))
     this.betChips.forEach((chip) => this.drawFancyChip(chip.x, chip.y, chip.amount))
   }
 
-  private drawFancyChip(x: number, y: number, amount: number) {
+  private drawFancyChip(x: number, y: number, amount: number, label?: string) {
     const r = (this.isMobile ? 30 : 35) * this.scaleFactor
 
-    let color = '#fff'
-    let stripeColor = '#ccc'
-    if (amount === 5) {
-      color = '#d92b2b'
-      stripeColor = '#fff'
-    } else if (amount === 10) {
-      color = '#2b4cd9'
-      stripeColor = '#fff'
-    } else if (amount === 50) {
-      color = '#2bd94c'
-      stripeColor = '#fff'
-    } else if (amount === 100) {
-      color = '#111'
-      stripeColor = '#d9b02b'
-    }
+    // 아케이드 팔레트 플랫 컬러
+    let color = '#ffffff'
+    if (label || amount < 0) color = C_LIME
+    else if (amount >= 1000) color = C_YELLOW
+    else if (amount >= 500) color = C_MAGENTA
+    else if (amount >= 100) color = C_CYAN
 
     this.ctx.save()
     this.ctx.translate(x, y)
 
-    this.ctx.shadowColor = 'transparent'
-    this.ctx.shadowBlur = 0
-    this.ctx.shadowOffsetY = 0
+    // 하드 오프셋 섀도우
+    this.ctx.fillStyle = '#000000'
+    this.ctx.beginPath()
+    this.ctx.arc(3, 3, r, 0, Math.PI * 2)
+    this.ctx.fill()
 
+    // 플랫 필 + 3px 보더
     this.ctx.fillStyle = color
     this.ctx.beginPath()
     this.ctx.arc(0, 0, r, 0, Math.PI * 2)
     this.ctx.fill()
-
-    this.ctx.strokeStyle = stripeColor
-    this.ctx.lineWidth = 8 * this.scaleFactor
-    this.ctx.setLineDash([10, 15])
-    this.ctx.beginPath()
-    this.ctx.arc(0, 0, r - 4, 0, Math.PI * 2)
-    this.ctx.stroke()
-    this.ctx.setLineDash([])
-
-    this.ctx.fillStyle = 'rgba(255,255,255,0.1)'
-    this.ctx.beginPath()
-    this.ctx.arc(0, 0, r * 0.65, 0, Math.PI * 2)
-    this.ctx.fill()
-
-    this.ctx.strokeStyle = 'rgba(0,0,0,0.2)'
-    this.ctx.lineWidth = 1
+    this.ctx.strokeStyle = '#000000'
+    this.ctx.lineWidth = 3
     this.ctx.stroke()
 
-    this.ctx.fillStyle = amount === 100 ? '#d9b02b' : amount === 1 ? '#000' : '#fff'
-    this.ctx.font = `bold ${18 * this.scaleFactor}px Arial`
+    // 안쪽 링 (플랫)
+    this.ctx.strokeStyle = 'rgba(0,0,0,0.35)'
+    this.ctx.lineWidth = 2
+    this.ctx.beginPath()
+    this.ctx.arc(0, 0, r * 0.7, 0, Math.PI * 2)
+    this.ctx.stroke()
+
+    const text = label ?? (amount >= 10000 ? `${Math.floor(amount / 1000)}K` : `${amount}`)
+    this.ctx.fillStyle = '#000000'
+    this.ctx.font = `${(text.length > 3 ? 9 : 11) * this.scaleFactor}px ${FONT_PIXEL}`
     this.ctx.textAlign = 'center'
     this.ctx.textBaseline = 'middle'
-    this.ctx.fillText(`${amount}`, 0, 0)
+    this.ctx.fillText(text, 0, 0)
 
     this.ctx.restore()
   }
@@ -1699,24 +1749,28 @@ export class BlackjackGame {
 
       this.ctx.save()
 
-      this.ctx.shadowColor = 'transparent'
-      this.ctx.shadowBlur = 0
-      this.ctx.shadowOffsetY = 0
+      let baseColor = C_YELLOW
+      if (btn.text === 'HIT') baseColor = C_LIME
+      if (btn.text === 'STAND') baseColor = C_MAGENTA
+      if (btn.text === 'DOUBLE') baseColor = C_YELLOW
+      if (btn.text === 'SPLIT') baseColor = C_CYAN
+      if (btn.text === 'Insurance') baseColor = C_CYAN
+      if (btn.text === 'No Thanks') baseColor = C_GRAY
 
-      let baseColor = '#eab308'
-      if (btn.text === 'HIT') baseColor = '#22c55e'
-      if (btn.text === 'STAND') baseColor = '#ef4444'
-
+      // 하드 오프셋 섀도우 + 플랫 필 + 3px 보더 (사각, 무광)
+      this.ctx.fillStyle = '#000000'
+      this.ctx.fillRect(btn.x + 4, btn.y + 4, btn.width, btn.height)
       this.ctx.fillStyle = baseColor
-      this.ctx.beginPath()
-      ;(this.ctx as any).roundRect(btn.x, btn.y, btn.width, btn.height, 8 * this.scaleFactor)
-      this.ctx.fill()
+      this.ctx.fillRect(btn.x, btn.y, btn.width, btn.height)
+      this.ctx.strokeStyle = '#000000'
+      this.ctx.lineWidth = 3
+      this.ctx.strokeRect(btn.x + 1.5, btn.y + 1.5, btn.width - 3, btn.height - 3)
 
-      this.ctx.fillStyle = '#fff'
-      this.ctx.font = `bold ${18 * this.scaleFactor}px sans-serif`
+      this.ctx.fillStyle = '#000000'
+      this.ctx.font = `${(btn.text.length > 6 ? 10 : 12) * this.scaleFactor}px ${FONT_PIXEL}`
       this.ctx.textAlign = 'center'
       this.ctx.textBaseline = 'middle'
-      this.ctx.fillText(btn.text, btn.x + btn.width / 2, btn.y + btn.height / 2)
+      this.ctx.fillText(btn.text.toUpperCase(), btn.x + btn.width / 2, btn.y + btn.height / 2)
 
       this.ctx.restore()
     })
@@ -1738,18 +1792,14 @@ export class BlackjackGame {
     const centerX = this.gameAreaWidth * 0.5
     const centerY = this.canvasHeight * 0.5
 
-    this.ctx.fillStyle = `rgba(0, 0, 0, ${0.7 * alpha})`
+    this.ctx.fillStyle = `rgba(10, 10, 26, ${0.75 * alpha})`
     this.ctx.fillRect(0, 0, this.gameAreaWidth, this.canvasHeight)
 
-    let bgColor = '#4caf50'
-    let textColor = '#ffffff'
-
-    if (this.gameResult.type === 'lose') bgColor = '#f44336'
-    else if (this.gameResult.type === 'draw') bgColor = '#ff9800'
-    else if (this.gameResult.type === 'blackjack') {
-      bgColor = '#ffd700'
-      textColor = '#000000'
-    }
+    // 결과별 아케이드 컬러 (승/블랙잭: 라임/옐로, 패: 마젠타-레드, 무: 그레이)
+    let accentColor = C_LIME
+    if (this.gameResult.type === 'lose') accentColor = C_LOSE
+    else if (this.gameResult.type === 'draw') accentColor = C_GRAY
+    else if (this.gameResult.type === 'blackjack') accentColor = C_YELLOW
 
     this.ctx.save()
     this.ctx.translate(centerX, centerY)
@@ -1758,60 +1808,34 @@ export class BlackjackGame {
 
     const boxWidth = 400 * this.scaleFactor
     const boxHeight = 200 * this.scaleFactor
-    const borderRadius = 20 * this.scaleFactor
 
-    const gradient = this.ctx.createLinearGradient(-boxWidth / 2, -boxHeight / 2, -boxWidth / 2, boxHeight / 2)
-    gradient.addColorStop(0, bgColor)
-    gradient.addColorStop(1, this.darkenColor(bgColor, 0.2))
+    // 하드 오프셋 섀도우 + 플랫 필 + 4px 픽셀 보더 (사각)
+    this.ctx.fillStyle = '#000000'
+    this.ctx.fillRect(-boxWidth / 2 + 8, -boxHeight / 2 + 8, boxWidth, boxHeight)
+    this.ctx.fillStyle = C_BG
+    this.ctx.fillRect(-boxWidth / 2, -boxHeight / 2, boxWidth, boxHeight)
+    this.ctx.strokeStyle = accentColor
+    this.ctx.lineWidth = 4
+    this.ctx.strokeRect(-boxWidth / 2 + 2, -boxHeight / 2 + 2, boxWidth - 4, boxHeight - 4)
 
-    this.ctx.fillStyle = gradient
-    this.roundRect(-boxWidth / 2, -boxHeight / 2, boxWidth, boxHeight, borderRadius)
-    this.ctx.fill()
-
-    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'
-    this.ctx.lineWidth = 3
-    this.roundRect(-boxWidth / 2, -boxHeight / 2, boxWidth, boxHeight, borderRadius)
-    this.ctx.stroke()
-
-    this.ctx.fillStyle = textColor
-    this.ctx.font = `bold ${60 * this.scaleFactor}px Arial`
+    this.ctx.fillStyle = accentColor
+    this.ctx.font = `bold ${40 * this.scaleFactor}px ${FONT_KR}`
     this.ctx.textAlign = 'center'
     this.ctx.textBaseline = 'middle'
-    this.ctx.fillText(this.gameResult.message, 0, -30 * this.scaleFactor)
+    this.ctx.fillText(this.gameResult.message, 0, -34 * this.scaleFactor)
 
     if (this.gameResult.winnings !== 0) {
       const pointsText = this.gameResult.winnings > 0 ? `+${this.gameResult.winnings} P` : `${this.gameResult.winnings} P`
-      this.ctx.font = `bold ${32 * this.scaleFactor}px Arial`
-      this.ctx.fillText(pointsText, 0, 30 * this.scaleFactor)
+      this.ctx.fillStyle = this.gameResult.winnings > 0 ? C_LIME : C_LOSE
+      this.ctx.font = `${20 * this.scaleFactor}px ${FONT_PIXEL}`
+      this.ctx.fillText(pointsText, 0, 26 * this.scaleFactor)
     }
 
-    this.ctx.font = `${24 * this.scaleFactor}px Arial`
-    this.ctx.fillStyle = `rgba(${textColor === '#ffffff' ? '255,255,255' : '0,0,0'}, 0.8)`
+    this.ctx.font = `${16 * this.scaleFactor}px ${FONT_KR}`
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'
     this.ctx.fillText(`플레이어: ${this.playerHand.score} | 딜러: ${this.dealerHand.score}`, 0, 70 * this.scaleFactor)
 
     this.ctx.restore()
-  }
-
-  private roundRect(x: number, y: number, width: number, height: number, radius: number) {
-    this.ctx.beginPath()
-    this.ctx.moveTo(x + radius, y)
-    this.ctx.lineTo(x + width - radius, y)
-    this.ctx.quadraticCurveTo(x + width, y, x + width, y + radius)
-    this.ctx.lineTo(x + width, y + height - radius)
-    this.ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height)
-    this.ctx.lineTo(x + radius, y + height)
-    this.ctx.quadraticCurveTo(x, y + height, x, y + height - radius)
-    this.ctx.lineTo(x, y + radius)
-    this.ctx.quadraticCurveTo(x, y, x + radius, y)
-    this.ctx.closePath()
-  }
-
-  private darkenColor(color: string, amount: number): string {
-    const num = parseInt(color.replace('#', ''), 16)
-    const r = Math.max(0, ((num >> 16) & 0xff) * (1 - amount))
-    const g = Math.max(0, ((num >> 8) & 0xff) * (1 - amount))
-    const b = Math.max(0, (num & 0xff) * (1 - amount))
-    return `#${Math.floor(r).toString(16).padStart(2, '0')}${Math.floor(g).toString(16).padStart(2, '0')}${Math.floor(b).toString(16).padStart(2, '0')}`
   }
 
   private renderSidebarContent() {
@@ -1844,43 +1868,42 @@ export class BlackjackGame {
       const currentY = y
       if (currentY + totalHeight > logEndY) return
 
-      const bgColor = index % 2 === 0 ? 'rgba(30, 41, 59, 0.5)' : 'rgba(51, 65, 85, 0.3)'
+      const bgColor = index % 2 === 0 ? 'rgba(26, 26, 46, 0.7)' : 'rgba(26, 26, 46, 0.35)'
 
       this.ctx.fillStyle = bgColor
-      this.roundRect(sx + padding, currentY - lineHeight + 6, this.sidebarWidth - padding * 2, totalHeight - spacing + 2, 4)
-      this.ctx.fill()
+      this.ctx.fillRect(sx + padding, currentY - lineHeight + 6, this.sidebarWidth - padding * 2, totalHeight - spacing + 2)
 
-      this.ctx.font = '12px monospace'
-      this.ctx.fillStyle = '#64748b'
+      this.ctx.font = `12px ${FONT_KR}`
+      this.ctx.fillStyle = 'rgba(0, 255, 255, 0.5)'
       this.ctx.fillText(`[${log.time}]`, sx + 40, currentY)
 
       if (log.round > 0) {
-        this.ctx.fillStyle = '#94a3b8'
-        this.ctx.font = '12px monospace'
+        this.ctx.fillStyle = C_GRAY
+        this.ctx.font = `12px ${FONT_KR}`
         this.ctx.fillText(`${log.round}R`, sx + 90, currentY)
 
         if (log.betAmount) {
-          this.ctx.fillStyle = '#fbbf24'
-          this.ctx.font = '12px monospace'
+          this.ctx.fillStyle = C_YELLOW
+          this.ctx.font = `12px ${FONT_KR}`
           this.ctx.fillText(`${log.betAmount.toLocaleString()}`, sx + 130, currentY)
         }
 
         let resultColor = '#fff'
-        if (log.type === 'win' || log.type === 'blackjack') resultColor = '#4ade80'
-        else if (log.type === 'lose') resultColor = '#f87171'
-        else if (log.type === 'draw') resultColor = '#fbbf24'
-        else if (log.type === 'info') resultColor = '#94a3b8'
+        if (log.type === 'win' || log.type === 'blackjack') resultColor = C_LIME
+        else if (log.type === 'lose') resultColor = C_LOSE
+        else if (log.type === 'draw') resultColor = C_GRAY
+        else if (log.type === 'info') resultColor = C_CYAN
 
         this.ctx.fillStyle = resultColor
-        this.ctx.font = 'bold 12px monospace'
+        this.ctx.font = `bold 12px ${FONT_KR}`
         const firstLine = lines[0].length > 20 ? lines[0].substring(0, 20) + '...' : lines[0]
         this.ctx.fillText(firstLine, sx + 20, currentY + lineHeight)
 
         let lineY = currentY + lineHeight
         for (let i = 1; i < lines.length; i++) {
           lineY += innerLineHeight
-          this.ctx.fillStyle = '#94a3b8'
-          this.ctx.font = '11px monospace'
+          this.ctx.fillStyle = C_GRAY
+          this.ctx.font = `11px ${FONT_KR}`
           const lineText = lines[i].length > 25 ? lines[i].substring(0, 25) + '...' : lines[i]
           this.ctx.fillText(lineText, sx + 20, lineY)
         }
@@ -1890,21 +1913,21 @@ export class BlackjackGame {
           const changeSign = log.pointsChange >= 0 ? '+' : ''
           const changeText = `${changeSign}${log.pointsChange.toLocaleString()}`
 
-          this.ctx.font = '11px sans-serif'
-          this.ctx.fillStyle = log.pointsChange >= 0 ? '#4ade80' : '#f87171'
+          this.ctx.font = `11px ${FONT_KR}`
+          this.ctx.fillStyle = log.pointsChange >= 0 ? C_LIME : C_LOSE
           this.ctx.fillText(changeText, sx + 20, lineY)
 
-          this.ctx.fillStyle = '#94a3b8'
-          this.ctx.font = '11px sans-serif'
+          this.ctx.fillStyle = C_GRAY
+          this.ctx.font = `11px ${FONT_KR}`
           this.ctx.fillText(`Bal: ${log.balance.toLocaleString()}`, sx + 100, lineY)
         }
       } else {
-        this.ctx.fillStyle = '#94a3b8'
-        this.ctx.font = '12px monospace'
+        this.ctx.fillStyle = C_GRAY
+        this.ctx.font = `12px ${FONT_KR}`
         this.ctx.fillText('입장', sx + 90, currentY)
 
-        this.ctx.font = '11px sans-serif'
-        this.ctx.fillStyle = '#fbbf24'
+        this.ctx.font = `11px ${FONT_KR}`
+        this.ctx.fillStyle = C_YELLOW
         this.ctx.textAlign = 'right'
         const infoText = log.message.replace('접속 성공 - ', '')
         this.ctx.fillText(infoText, sx + this.sidebarWidth - 10, currentY)
