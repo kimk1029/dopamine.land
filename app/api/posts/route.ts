@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
 
     // 공지는 관리자만 작성 가능
     const asNotice = isNotice === true && user.userType === 1
-    const allowedCategories = ['자유', '공지', '정보', '질문']
+    const allowedCategories = ['자유', '공지', '정보', '질문', '가챠교환']
     const postCategory = asNotice
       ? '공지'
       : allowedCategories.includes(category)

@@ -1,11 +1,10 @@
 /**
- * kujihub 로컬 DB(community_posts / community_comments)의 데이터를
+ * kujihub 서버(기본: 시놀로지 운영 서버)의 community 데이터를
  * 통합 DB(Post / Comment)로 이관한다.
  *
- * 실행:
- *   KUJIHUB_DATABASE_URL="postgresql://postgres@localhost:5432/kujihub" \
- *     node scripts/migrate-kujihub-community.js
- *   (통합 DB 접속은 .env.local의 DATABASE_URL 사용)
+ * 실행: node scripts/migrate-kujihub-community.js
+ *   - 통합 DB 접속은 DATABASE_URL 환경변수 사용 (.env.local 참고)
+ *   - 소스는 KUJIHUB_API_ORIGIN (기본 http://kimk1029.synology.me:9933)
  *
  * 작성자 매핑: kujihub 커뮤니티는 익명 문자열 작성자라서, 닉네임이 일치하는
  * 계정이 있으면 그 계정으로, 없으면 'KUJIHUB' 이관용 계정으로 귀속시키고
@@ -14,21 +13,19 @@
 const crypto = require('crypto')
 const { PrismaClient } = require('@prisma/client')
 
-const target = new PrismaClient()
-const source = new PrismaClient({
-  datasources: {
-    db: {
-      url:
-        process.env.KUJIHUB_DATABASE_URL ||
-        'postgresql://postgres@localhost:5432/kujihub',
-    },
-  },
-})
+const ORIGIN = process.env.KUJIHUB_API_ORIGIN || 'http://kimk1029.synology.me:9933'
+const prisma = new PrismaClient()
+
+async function fetchJson(path) {
+  const res = await fetch(`${ORIGIN}${path}`)
+  if (!res.ok) throw new Error(`${path} 요청 실패: ${res.status}`)
+  return res.json()
+}
 
 async function getFallbackUser() {
-  const existing = await target.user.findFirst({ where: { nickname: 'KUJIHUB' } })
+  const existing = await prisma.user.findFirst({ where: { nickname: 'KUJIHUB' } })
   if (existing) return existing
-  return target.user.create({
+  return prisma.user.create({
     data: {
       email: 'kujihub-import@dopamine.land',
       password: crypto.randomBytes(32).toString('hex'), // 로그인 불가 계정
@@ -38,16 +35,11 @@ async function getFallbackUser() {
 }
 
 async function main() {
-  const posts = await source.$queryRawUnsafe(
-    'SELECT id, category, is_notice, title, content, author, created_at FROM community_posts ORDER BY id'
-  )
-  const comments = await source.$queryRawUnsafe(
-    'SELECT id, post_id, author, content, created_at FROM community_comments ORDER BY id'
-  )
-  console.log(`kujihub: 게시글 ${posts.length}건, 댓글 ${comments.length}건 발견`)
+  const posts = await fetchJson('/api/community/posts')
+  console.log(`kujihub 서버: 게시글 ${posts.length}건 발견`)
 
   const fallback = await getFallbackUser()
-  const users = await target.user.findMany({ select: { id: true, nickname: true } })
+  const users = await prisma.user.findMany({ select: { id: true, nickname: true } })
   const byNickname = new Map(users.map((u) => [u.nickname, u.id]))
 
   const resolveAuthor = (author) => {
@@ -57,53 +49,55 @@ async function main() {
       : { authorId: fallback.id, prefix: `[원작성자: ${author || '익명'}]\n\n` }
   }
 
-  const postIdMap = new Map()
+  let newPosts = 0
+  let newComments = 0
   let skipped = 0
 
   for (const p of posts) {
-    const dup = await target.post.findFirst({
-      where: { title: p.title, createdAt: p.created_at },
-    })
+    const createdAt = new Date(p.createdAt)
+    let targetId
+    const dup = await prisma.post.findFirst({ where: { title: p.title, createdAt } })
     if (dup) {
-      postIdMap.set(p.id, dup.id)
+      targetId = dup.id
       skipped++
-      continue
+    } else {
+      const { authorId, prefix } = resolveAuthor(p.author)
+      const created = await prisma.post.create({
+        data: {
+          title: p.title,
+          content: prefix + (p.content || ''),
+          category: p.isNotice ? '공지' : p.category || '자유',
+          isNotice: Boolean(p.isNotice),
+          authorId,
+          createdAt,
+        },
+      })
+      targetId = created.id
+      newPosts++
     }
-    const { authorId, prefix } = resolveAuthor(p.author)
-    const created = await target.post.create({
-      data: {
-        title: p.title,
-        content: prefix + (p.content || ''),
-        category: p.is_notice ? '공지' : p.category || '자유',
-        isNotice: Boolean(p.is_notice),
-        authorId,
-        createdAt: p.created_at,
-      },
-    })
-    postIdMap.set(p.id, created.id)
-  }
-  console.log(`게시글 이관 완료 (신규 ${postIdMap.size - skipped}, 중복 스킵 ${skipped})`)
 
-  let migratedComments = 0
-  for (const c of comments) {
-    const postId = postIdMap.get(c.post_id)
-    if (!postId) continue
-    const dup = await target.comment.findFirst({
-      where: { postId, createdAt: c.created_at, content: c.content },
-    })
-    if (dup) continue
-    const { authorId, prefix } = resolveAuthor(c.author)
-    await target.comment.create({
-      data: {
-        content: prefix + c.content,
-        postId,
-        authorId,
-        createdAt: c.created_at,
-      },
-    })
-    migratedComments++
+    if (!p.commentCount) continue
+    const comments = await fetchJson(`/api/community/posts/${p.id}/comments`)
+    for (const c of comments) {
+      const cCreatedAt = new Date(c.createdAt)
+      const cDup = await prisma.comment.findFirst({
+        where: { postId: targetId, createdAt: cCreatedAt, content: { endsWith: c.content } },
+      })
+      if (cDup) continue
+      const { authorId, prefix } = resolveAuthor(c.author)
+      await prisma.comment.create({
+        data: {
+          content: prefix + c.content,
+          postId: targetId,
+          authorId,
+          createdAt: cCreatedAt,
+        },
+      })
+      newComments++
+    }
   }
-  console.log(`댓글 이관 완료 (신규 ${migratedComments})`)
+
+  console.log(`이관 완료: 게시글 신규 ${newPosts} (중복 스킵 ${skipped}), 댓글 신규 ${newComments}`)
 }
 
 main()
@@ -111,7 +105,4 @@ main()
     console.error(e)
     process.exitCode = 1
   })
-  .finally(async () => {
-    await source.$disconnect()
-    await target.$disconnect()
-  })
+  .finally(() => prisma.$disconnect())

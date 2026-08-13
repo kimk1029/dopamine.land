@@ -23,6 +23,7 @@ const CATEGORIES = [
   { key: '자유', label: 'FREE' },
   { key: '정보', label: 'INFO' },
   { key: '질문', label: 'Q&A' },
+  { key: '가챠교환', label: 'TRADE' },
 ]
 
 const ITEMS_PER_PAGE = 15
