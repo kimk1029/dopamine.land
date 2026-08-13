@@ -235,7 +235,12 @@ export default function Home() {
                                                 if (value === undefined || value === null || typeof value !== 'number') return ['0 P', 'Points']
                                                 return [`${value.toLocaleString()} P`, 'Points']
                                             }}
-                                            labelFormatter={(label) => new Date(label).toLocaleDateString()}
+                                            // recharts 3.10 부터 label 이 ReactNode 로 넓어져서 Date 에 그대로 못 넣는다.
+                                            labelFormatter={(label) =>
+                                                typeof label === 'string' || typeof label === 'number'
+                                                    ? new Date(label).toLocaleDateString()
+                                                    : ''
+                                            }
                                         />
                                         <Line
                                             type="monotone"
