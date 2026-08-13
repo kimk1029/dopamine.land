@@ -3,12 +3,13 @@
  * 크래시 포인트를 서버에서 생성
  */
 
-// 크래시 포인트 생성 (1.00 ~ 1000.00)
+// 크래시 포인트 생성 (1.01 ~ 1000.00)
+// 즉사(1.00) 라운드 없이 최소 1% 상승은 보장하고, 그 이후 시점은
+// heavy-tail 분포(0.99/(1-r))를 따라 랜덤하게 터진다.
 export function generateCrashPoint(): number {
   const r = Math.random()
-  // 공정한 확률 분포를 위한 공식
   const crashPoint = 0.99 / (1 - r)
-  return Math.max(1.0, Math.floor(crashPoint * 100) / 100)
+  return Math.min(1000, Math.max(1.01, Math.floor(crashPoint * 100) / 100))
 }
 
 // 배율 계산 (시간 기반)

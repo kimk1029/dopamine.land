@@ -37,6 +37,10 @@ const C_LIME = '#39ff14'
 const C_YELLOW = '#ffe600'
 const C_LOSE = '#ff3366'
 const C_GRAY = '#9ca3af'
+// 클래식 그린 펠트 (픽셀 톤)
+const C_FELT = '#0a5c2f'
+const C_FELT_DARK = '#084a26'
+const C_FELT_EDGE = '#063d1f'
 
 interface Button {
   x: number
@@ -72,6 +76,7 @@ export class BlackjackGame {
   private roundNumber: number = 0
   private isProcessing: boolean = false
   private gameSessionId: string | null = null
+  private isDemo: boolean = false // 토큰 없음 → 로컬 데모 플레이 (서버 호출 없음)
 
   // [최적화] 정적 배경 캐싱
   private staticCanvas: HTMLCanvasElement | null = null
@@ -464,6 +469,7 @@ export class BlackjackGame {
   private async loadUserPoints() {
     const token = localStorage.getItem('token')
     if (!token) {
+      this.isDemo = true
       this.playerPoints = 10000
       this.addLog('info', '체험판(데모) 모드 - 10,000P 지급됨', 0, 10000)
       this.changeState(GameState.SHUFFLE)
@@ -704,6 +710,25 @@ export class BlackjackGame {
     if (this.isProcessing) return false
     this.isProcessing = true
 
+    // 데모 모드: 서버 호출 없이 로컬 덱으로 딜링 (베팅은 칩 추가 시 이미 차감됨)
+    if (this.isDemo) {
+      if (this.dealButton) this.dealButton.visible = false
+
+      await this.dealCardLocal('player', true, 0)
+      await this.dealCardLocal('dealer', true, 0)
+      await this.dealCardLocal('player', true, 1)
+      await this.dealCardLocal('dealer', false, 1)
+
+      this.updateScores()
+
+      const dealerUp = this.dealerHand.cards[0]
+      if (dealerUp?.value === 'A') this.changeState(GameState.INSURANCE)
+      else this.changeState(GameState.CHECK_BLACKJACK)
+
+      this.isProcessing = false
+      return true
+    }
+
     const token = localStorage.getItem('token')
     if (!token) {
       this.showMessage('로그인이 필요합니다.')
@@ -881,8 +906,14 @@ export class BlackjackGame {
   private handleCheckBlackjack() {
     this.updateScores()
     if (isBlackjack(this.playerHand)) {
-      // 플레이어가 블랙잭이면 서버 결과에 따라 정산 (일단 딜러 턴으로 넘김)
-      this.changeState(GameState.DEALER_TURN)
+      if (this.isDemo) {
+        // 데모: 로컬 딜러 턴에서 공개/정산
+        this.changeState(GameState.DEALER_TURN)
+      } else {
+        // 로그인 플레이: 자연 블랙잭도 서버 stand 액션으로 정산해야
+        // 세션이 settled 되고 배당(2.5배)/푸시(딜러 블랙잭)와 히스토리가 기록된다.
+        this.playerStand()
+      }
     } else {
       this.changeState(GameState.PLAYER_TURN)
     }
@@ -935,6 +966,23 @@ export class BlackjackGame {
   }
 
   private async playerHit() {
+    // 데모 모드: 로컬 덱에서 히트
+    if (this.isDemo) {
+      this.isProcessing = true
+      await this.dealCardLocal('player', true, this.playerHand.cards.length)
+      this.updateScores()
+
+      if (this.playerHand.isBust) {
+        this.buttons = []
+        await this.revealDealerHoleCardLocal()
+        this.updateScores()
+        await this.settleGame('lose')
+      } else {
+        this.isProcessing = false
+      }
+      return
+    }
+
     if (!this.gameSessionId) return
     this.isProcessing = true
 
@@ -999,6 +1047,14 @@ export class BlackjackGame {
    * - 이후 딜러 draw 처리(서버 기반)
    */
   private async playerStand() {
+    // 데모 모드: 로컬 딜러 턴 진행
+    if (this.isDemo) {
+      this.isProcessing = true
+      this.buttons = []
+      this.changeState(GameState.DEALER_TURN)
+      return
+    }
+
     if (!this.gameSessionId) return
     this.isProcessing = true
     this.buttons = []
@@ -1110,6 +1166,35 @@ export class BlackjackGame {
   }
 
   private async playerDouble() {
+    // 데모 모드: 서버와 동일 규칙 (첫 2장만, 추가 베팅, 한 장 받고 자동 스탠드)
+    if (this.isDemo) {
+      if (this.playerHand.cards.length !== 2) {
+        this.showMessage('더블다운은 첫 2장에서만 가능합니다.')
+        return
+      }
+      if (this.playerPoints < this.currentBet) {
+        this.showMessage('포인트가 부족합니다.')
+        return
+      }
+
+      this.isProcessing = true
+      this.buttons = []
+      this.playerPoints -= this.currentBet
+      this.currentBet *= 2
+
+      await this.dealCardLocal('player', true, this.playerHand.cards.length)
+      this.updateScores()
+
+      if (this.playerHand.isBust) {
+        await this.revealDealerHoleCardLocal()
+        this.updateScores()
+        await this.settleGame('lose')
+      } else {
+        this.changeState(GameState.DEALER_TURN)
+      }
+      return
+    }
+
     if (!this.gameSessionId) return
     this.isProcessing = true
 
@@ -1266,22 +1351,80 @@ export class BlackjackGame {
     }
   }
 
+  // (로컬/데모) 딜러 턴: 홀 카드 공개 후 서버와 동일 규칙으로 드로우 (소프트 17 히트)
   private async handleDealerTurn() {
     this.isProcessing = true
-    this.revealDealerCard()
+    await this.revealDealerHoleCardLocal()
     await this.delay(500)
     this.updateScores()
 
-    while (this.dealerHand.score < 17) {
-      await this.dealCardLocal('dealer', true, this.dealerHand.cards.length)
-      this.updateScores()
+    // 플레이어 블랙잭이면 딜러는 추가 드로우 없이 홀 카드만 공개
+    if (!isBlackjack(this.playerHand)) {
+      while (this.dealerShouldHitLocal()) {
+        await this.dealCardLocal('dealer', true, this.dealerHand.cards.length)
+        this.updateScores()
+      }
     }
     this.changeState(GameState.SETTLEMENT)
   }
 
-  private revealDealerCard() {
+  // 서버 규칙과 동일: 16 이하 히트, 소프트 17도 히트
+  private dealerShouldHitLocal(): boolean {
+    const score = this.dealerHand.score
+    if (score < 17) return true
+    return score === 17 && this.isSoftHand(this.dealerHand.cards)
+  }
+
+  // A를 11로 계산 중인 핸드인지 (소프트 핸드 판정)
+  private isSoftHand(cards: Card[]): boolean {
+    let hardSum = 0
+    let hasAce = false
+    for (const c of cards) {
+      if (c.value === 'A') {
+        hasAce = true
+        hardSum += 1
+      } else if (c.value === 'J' || c.value === 'Q' || c.value === 'K') {
+        hardSum += 10
+      } else {
+        hardSum += parseInt(c.value, 10) || 0
+      }
+    }
+    return hasAce && hardSum + 10 <= 21
+  }
+
+  // (로컬/데모) 딜러 홀 카드 공개 - flip 애니메이션 포함
+  private async revealDealerHoleCardLocal() {
     const hidden = this.dealerHand.cards.find((c) => !c.faceUp)
-    if (hidden) hidden.faceUp = true
+    if (!hidden) return
+
+    hidden.faceUp = true
+    const sprite = this.cardSprites.get(hidden)
+    if (!sprite) {
+      this.ensureSprite(hidden, true)
+      return
+    }
+
+    sprite.faceUp = false
+    sprite.flipRotation = 0
+    this.animations.push({
+      type: 'flip',
+      startX: sprite.x,
+      startY: sprite.y,
+      targetX: sprite.x,
+      targetY: sprite.y,
+      duration: 600,
+      startTime: Date.now(),
+      card: hidden,
+      faceUp: true,
+      flipRotation: 0,
+    })
+
+    await this.delay(650)
+    const finalSprite = this.cardSprites.get(hidden)
+    if (finalSprite) {
+      finalSprite.faceUp = true
+      finalSprite.flipRotation = undefined
+    }
   }
 
   // (로컬 fallback) 서버가 아닌 경우에만 사용
@@ -1345,6 +1488,11 @@ export class BlackjackGame {
     } else {
       winnings = 0
       message = '패배'
+    }
+
+    // 데모 모드: 서버 대신 로컬 잔액에 정산 (베팅금은 이미 차감된 상태)
+    if (this.isDemo && serverPoints === undefined) {
+      this.playerPoints += winnings
     }
 
     this.updateScores(this.serverDealerFinalScore ?? undefined)
@@ -1497,38 +1645,65 @@ export class BlackjackGame {
     this.animationFrameId = requestAnimationFrame(() => this.render())
   }
 
+  // 8x8 디더 타일 (그린 펠트 질감, 1회 생성 후 캐시)
+  private feltTile: HTMLCanvasElement | null = null
+
+  private getFeltTile(): HTMLCanvasElement | null {
+    if (this.feltTile) return this.feltTile
+    const tile = document.createElement('canvas')
+    tile.width = 8
+    tile.height = 8
+    const tctx = tile.getContext('2d')
+    if (!tctx) return null
+    tctx.fillStyle = C_FELT
+    tctx.fillRect(0, 0, 8, 8)
+    // 체커보드 2x2 다크 도트 디더링
+    tctx.fillStyle = C_FELT_DARK
+    tctx.fillRect(0, 0, 2, 2)
+    tctx.fillRect(4, 4, 2, 2)
+    this.feltTile = tile
+    return tile
+  }
+
   private drawTablePattern(targetCtx?: CanvasRenderingContext2D) {
     const ctx = targetCtx || this.ctx
+    const w = this.gameAreaWidth
+    const h = this.canvasHeight
 
-    // 아케이드 픽셀 그리드 배경
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)'
-    ctx.lineWidth = 1
-    for (let gx = 0; gx <= this.gameAreaWidth; gx += 40) {
-      ctx.beginPath()
-      ctx.moveTo(gx + 0.5, 0)
-      ctx.lineTo(gx + 0.5, this.canvasHeight)
-      ctx.stroke()
-    }
-    for (let gy = 0; gy <= this.canvasHeight; gy += 40) {
-      ctx.beginPath()
-      ctx.moveTo(0, gy + 0.5)
-      ctx.lineTo(this.gameAreaWidth, gy + 0.5)
-      ctx.stroke()
+    // 그린 펠트 플레이필드 (디더링된 2톤 픽셀 텍스처)
+    ctx.fillStyle = C_FELT
+    ctx.fillRect(0, 0, w, h)
+    const tile = this.getFeltTile()
+    if (tile) {
+      const pattern = ctx.createPattern(tile, 'repeat')
+      if (pattern) {
+        ctx.fillStyle = pattern
+        ctx.fillRect(0, 0, w, h)
+      }
     }
 
-    ctx.strokeStyle = 'rgba(0, 255, 255, 0.15)'
+    // 테이블 엣지: 청키 다크 그린 링 + 3px 블랙 라인 (사각 코너)
+    ctx.strokeStyle = C_FELT_EDGE
+    ctx.lineWidth = 12
+    ctx.strokeRect(6, 6, w - 12, h - 12)
+    ctx.strokeStyle = '#000000'
+    ctx.lineWidth = 3
+    ctx.strokeRect(13.5, 13.5, w - 27, h - 27)
+
+    // 테이블 마킹 아치
+    ctx.strokeStyle = 'rgba(255, 230, 0, 0.25)'
     ctx.lineWidth = 3 * this.scaleFactor
     ctx.beginPath()
-    ctx.arc(this.gameAreaWidth / 2, -400 * this.scaleFactor, 1000 * this.scaleFactor, 0, Math.PI, false)
+    ctx.arc(w / 2, -400 * this.scaleFactor, 1000 * this.scaleFactor, 0, Math.PI, false)
     ctx.stroke()
 
-    ctx.fillStyle = 'rgba(255, 0, 255, 0.25)'
+    ctx.fillStyle = 'rgba(255, 230, 0, 0.3)'
     ctx.font = `${20 * this.scaleFactor}px ${FONT_PIXEL}`
     ctx.textAlign = 'center'
-    ctx.fillText('BLACKJACK PAYS 3 TO 2', this.gameAreaWidth / 2, this.canvasHeight * 0.4)
-    ctx.fillStyle = 'rgba(0, 255, 255, 0.25)'
+    ctx.fillText('BLACKJACK PAYS 3 TO 2', w / 2, this.canvasHeight * 0.4)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)'
     ctx.font = `${10 * this.scaleFactor}px ${FONT_PIXEL}`
-    ctx.fillText('DEALER MUST STAND ON 17 AND DRAW TO 16', this.gameAreaWidth / 2, this.canvasHeight * 0.45)
+    ctx.fillText('DEALER MUST STAND ON 17 AND DRAW TO 16', w / 2, this.canvasHeight * 0.45)
   }
 
   private renderGameElements() {

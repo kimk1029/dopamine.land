@@ -46,10 +46,20 @@ const FONT_KR = "'Galmuri11', monospace";
 const MAX_BET = 1000000; // 서버측 상한 (app/api/game/crash/route.ts)
 const DEMO_START_POINTS = 10000;
 
-// 데모 모드 전용 크래시 포인트 (서버 lib/game-servers/crash-server.ts 와 동일한 분포)
+// 데모 모드 전용 크래시 포인트 (서버 lib/game-servers/crash-server.ts 와 동일한 분포, [1.01, 1000])
 function generateDemoCrashPoint(): number {
   const r = Math.random();
-  return Math.max(1.0, Math.floor((0.99 / (1 - r)) * 100) / 100);
+  return Math.min(1000, Math.max(1.01, Math.floor((0.99 / (1 - r)) * 100) / 100));
+}
+
+// 크래시 폭발 파티클 (사각 픽셀 파편)
+interface CrashParticle {
+  x: number;
+  y: number;
+  vx: number; // px/sec
+  vy: number; // px/sec
+  color: string;
+  size: number;
 }
 
 export class BustabitGame {
@@ -102,6 +112,10 @@ export class BustabitGame {
   private isDraggingSlider: boolean = false;
 
   private crashHistory: number[] = []; // 라운드 크래시 배율 히스토리 (현재 세션)
+
+  // 크래시 폭발 연출 상태
+  private crashParticles: CrashParticle[] = [];
+  private crashAnimStart: number = 0;
 
   private onMessage?: (message: string) => void;
   private onLoadingProgress?: (progress: number) => void;
@@ -783,6 +797,7 @@ export class BustabitGame {
 
     this.stopAnimation();
     this.updateButtonStates();
+    this.spawnCrashExplosion();
     this.processCrashResult().finally(() => {
       if (this.onRoundEnd) this.onRoundEnd();
     });
@@ -1081,6 +1096,7 @@ export class BustabitGame {
       this.drawGraphCurve(originX, originY, graphWidth, graphHeight, currentMaxY, timeMaxX);
     }
 
+    this.drawCrashExplosion();
     this.drawStatusText();
     this.renderUI();
     this.renderButtons();
@@ -1222,19 +1238,134 @@ export class BustabitGame {
       prevQy = qy;
     }
 
-    // 끝점 마커 (사각 픽셀)
+    // 그래프 선단 (로켓 / 크래시 잔해)
     const qx = Math.round(lastX / px) * px;
     const qy = Math.round(lastY / px) * px;
     if (this.crashed) {
-      // 크래시 순간: magenta 버스트 플래시
-      this.ctx.fillStyle = C.magenta;
-      this.ctx.fillRect(qx - 12, qy - 12, 24, 24);
-      this.ctx.fillStyle = C.white;
-      this.ctx.fillRect(qx - 6, qy - 6, 12, 12);
+      // 폭발 파티클이 사라진 뒤 magenta 잔해 마커만 남김
+      if (this.crashParticles.length === 0) {
+        this.ctx.fillStyle = C.magenta;
+        this.ctx.fillRect(qx - 6, qy - 6, 12, 12);
+      }
     } else {
-      this.ctx.fillStyle = color;
-      this.ctx.fillRect(qx - 6, qy - 6, 12, 12);
+      // 곡선의 현재 진행 방향 (우상향)으로 로켓 회전
+      const dxdt = w / maxX;
+      const dydt = -(h / (maxY - 1)) * this.gameSpeed * targetMultiplier;
+      this.drawRocket(qx, qy, Math.atan2(dydt, dxdt));
     }
+  }
+
+  // 그래프 선단의 픽셀 로켓 (+x 방향 기준으로 그린 뒤 진행 방향으로 회전)
+  private drawRocket(x: number, y: number, angle: number) {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+
+    const flicker = ((Date.now() >> 6) & 1) === 0;
+
+    // 화염 트레일 (꼬리쪽, 깜빡임)
+    ctx.fillStyle = flicker ? C.yellow : '#ff9900';
+    ctx.fillRect(-14, -3, 5, 6);
+    ctx.fillStyle = flicker ? '#ff9900' : C.yellow;
+    ctx.fillRect(-9, -2, 3, 4);
+
+    // 핀 (cyan)
+    ctx.fillStyle = C.cyan;
+    ctx.fillRect(-6, -7, 4, 3);
+    ctx.fillRect(-6, 4, 4, 3);
+
+    // 몸체 (white + cyan 스트라이프)
+    ctx.fillStyle = C.white;
+    ctx.fillRect(-6, -4, 10, 8);
+    ctx.fillStyle = C.cyan;
+    ctx.fillRect(-6, -1, 10, 2);
+
+    // 노즈 (magenta)
+    ctx.fillStyle = C.magenta;
+    ctx.fillRect(4, -3, 4, 6);
+    ctx.fillRect(8, -2, 3, 4);
+
+    ctx.restore();
+  }
+
+  // 크래시 지점 좌표 계산 (drawGraphCurve와 동일한 좌표계)
+  private graphTipPosition(): { x: number; y: number } {
+    const padding = 60;
+    const w = this.gameAreaWidth - padding * 2;
+    const h = this.canvasHeight - padding * 2;
+    const ox = padding;
+    const oy = this.canvasHeight - padding;
+
+    const maxY = Math.max(2.0, this.crashPoint * 1.1);
+    const maxX = Math.max(6.0, Math.log(maxY) / this.gameSpeed);
+    const drawTime = Math.log(this.crashPoint) / this.gameSpeed;
+
+    return {
+      x: ox + (drawTime / maxX) * w,
+      y: oy - ((this.crashPoint - 1) / (maxY - 1)) * h,
+    };
+  }
+
+  // 크래시 순간: 로켓 폭발 파티클 생성 + 단독 애니메이션 루프 (~0.9s)
+  private spawnCrashExplosion() {
+    const tip = this.graphTipPosition();
+    const colors = [C.yellow, '#ff9900', C.magenta, C.white];
+    const count = 14;
+
+    this.crashParticles = [];
+    for (let i = 0; i < count; i++) {
+      const ang = (Math.PI * 2 * i) / count + Math.random() * 0.4;
+      const speed = 60 + Math.random() * 140; // px/sec
+      this.crashParticles.push({
+        x: tip.x,
+        y: tip.y,
+        vx: Math.cos(ang) * speed,
+        vy: Math.sin(ang) * speed - 40, // 살짝 위로 튀어오름
+        color: colors[i % colors.length],
+        size: 4 + Math.floor(Math.random() * 3) * 2, // 4 / 6 / 8px
+      });
+    }
+    this.crashAnimStart = Date.now();
+
+    const DURATION = 900;
+    const animate = () => {
+      if ((this.canvas as any).__activeBustabitInstance !== this.instanceId) return;
+      const elapsed = Date.now() - this.crashAnimStart;
+      this.render();
+      if (elapsed < DURATION && this.crashed) {
+        requestAnimationFrame(animate);
+      } else {
+        this.crashParticles = [];
+        this.render();
+      }
+    };
+    requestAnimationFrame(animate);
+  }
+
+  // 폭발 파티클 렌더링 (사각 픽셀 파편 + 첫 프레임 화이트 플래시)
+  private drawCrashExplosion() {
+    if (this.crashParticles.length === 0) return;
+
+    const elapsed = (Date.now() - this.crashAnimStart) / 1000;
+    const life = 0.9;
+    const t = Math.min(1, elapsed / life);
+
+    // 짧은 화이트 플래시 프레임
+    if (elapsed < 0.07) {
+      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      this.ctx.fillRect(0, 0, this.gameAreaWidth, this.canvasHeight);
+    }
+
+    this.ctx.globalAlpha = 1 - t;
+    for (const p of this.crashParticles) {
+      const x = p.x + p.vx * elapsed;
+      const y = p.y + p.vy * elapsed + 140 * elapsed * elapsed; // 중력
+      // 2px 그리드로 양자화해서 픽셀 느낌 유지
+      this.ctx.fillStyle = p.color;
+      this.ctx.fillRect(Math.round(x / 2) * 2 - p.size / 2, Math.round(y / 2) * 2 - p.size / 2, p.size, p.size);
+    }
+    this.ctx.globalAlpha = 1;
   }
 
   private drawStatusText() {
