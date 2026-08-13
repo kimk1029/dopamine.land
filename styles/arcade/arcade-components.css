@@ -104,7 +104,7 @@
 
 .arcade-box-v2 {
   position: relative;
-  padding: 20px;
+  padding: 24px;
   font-family: 'Galmuri11', sans-serif;
   color: var(--arcade-text);
   background-color: rgba(26, 26, 46, 0.9);
@@ -114,6 +114,12 @@
 
 .arcade-box-content {
   min-width: 0;
+  overflow-wrap: break-word;
+}
+
+/* 라벨이 박스 상단 테두리에 걸쳐 있어서, 라벨이 있으면 내용 첫 줄과 겹치지 않게 띄운다. */
+.arcade-box-label + .arcade-box-content {
+  padding-top: 10px;
 }
 
 .arcade-box-label {

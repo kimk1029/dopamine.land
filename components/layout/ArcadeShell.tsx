@@ -52,7 +52,6 @@ const ARCADE_ITEMS: NavItem[] = [
   { path: '/game', label: 'GAME', icon: '🕹️', mobile: true },
   { path: '/leaderboard', label: 'RANK', icon: '🏆' },
   { path: '/charge', label: 'CHARGE', icon: '⚡' },
-  { path: '/arcade/profile', label: 'POINT', icon: '🪙' },
   { path: '/admin', label: 'ADMIN', icon: '🛡️', adminOnly: true },
 ]
 

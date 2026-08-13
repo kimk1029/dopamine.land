@@ -630,7 +630,7 @@ export function HomePage() {
                 color: 'rgba(255,255,255,0.2)'
               }}>
                 {selectedEvent.image ? (
-                  <img src={selectedEvent.image} alt="Event Thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={selectedEvent.image} alt="Event Thumbnail" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top' }} />
                 ) : (
                   <div style={{ fontSize: '2.5rem' }}>🎰</div>
                 )}

@@ -99,7 +99,7 @@ export function KujiListPage() {
                 <img 
                   src={item.imageUrl} 
                   alt={item.title} 
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', imageRendering: 'auto' }} 
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', imageRendering: 'auto' }}
                 />
               ) : (
                 <div style={{ fontSize: '3rem' }}>
