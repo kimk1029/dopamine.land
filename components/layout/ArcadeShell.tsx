@@ -12,6 +12,11 @@ import {
   registerUserRefresh,
   type SessionUser,
 } from '@/lib/user-session'
+import {
+  clearWebAuthSession,
+  getWebAuthSession,
+  type WebAuthSession,
+} from '@/lib/kujihub/auth/webAuth'
 
 interface NavItem {
   path: string
@@ -22,15 +27,34 @@ interface NavItem {
   adminOnly?: boolean
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { path: '/', label: 'HOME', icon: '🏠', mobile: true },
+interface NavGroup {
+  title: string
+  items: NavItem[]
+}
+
+/** kujihub 웹에서 옮겨온 1차 메뉴. 사이트의 기본 화면들이다. */
+const KUJIHUB_ITEMS: NavItem[] = [
+  { path: '/dashboard', label: 'HOME', icon: '🏠', mobile: true },
+  { path: '/kuji', label: 'KUJI', icon: '🎰', mobile: true },
+  { path: '/calc', label: 'CALC', icon: '🧮' },
+  { path: '/media', label: 'MEDIA', icon: '📺' },
+  { path: '/feed', label: 'FEED', icon: '📡' },
+  { path: '/community', label: 'COMM', icon: '👥', mobile: true },
+  { path: '/profile', label: 'MY', icon: '👤', mobile: true },
+]
+
+/**
+ * test-board-app 이 원래 갖고 있던 메뉴. 쿠지허브 레이아웃 안에서
+ * 서브 메뉴 그룹으로 들어간다. `/arcade` 는 옮기기 전 이 앱의 첫 화면.
+ */
+const ARCADE_ITEMS: NavItem[] = [
+  { path: '/arcade', label: 'ARCADE', icon: '🎪' },
   { path: '/game', label: 'GAME', icon: '🕹️', mobile: true },
-  { path: '/game/kuji', label: 'KUJI', icon: '🎰', mobile: true },
   { path: '/leaderboard', label: 'RANK', icon: '🏆' },
-  { path: '/board', label: 'BOARD', icon: '📋', mobile: true },
+  { path: '/board', label: 'BOARD', icon: '📋' },
   { path: '/charge', label: 'CHARGE', icon: '⚡' },
   { path: '/notice', label: 'NOTICE', icon: '📢' },
-  { path: '/profile', label: 'MY', icon: '👤', mobile: true },
+  { path: '/arcade/profile', label: 'POINT', icon: '🪙' },
   { path: '/admin', label: 'ADMIN', icon: '🛡️', adminOnly: true },
 ]
 
@@ -50,6 +74,12 @@ const getInitials = (name: string) => {
 const isCabinetRoute = (pathname: string) => /^\/game\/[^/]+/.test(pathname)
 
 /**
+ * 랜딩(로그인 게이트)은 kujihub 웹에서도 사이드바 밖에 있던 화면이라
+ * 셸을 씌우지 않고 그대로 내보낸다.
+ */
+const isBareRoute = (pathname: string) => pathname === '/'
+
+/**
  * Picks the deepest matching nav entry so `/game/kuji` highlights KUJI
  * rather than also lighting up GAME.
  */
@@ -65,10 +95,12 @@ const resolveActivePath = (pathname: string, items: NavItem[]) => {
 export default function ArcadeShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [user, setUser] = useState<SessionUser | null>(null)
+  const [kujiSession, setKujiSession] = useState<WebAuthSession | null>(null)
   const [loginOpen, setLoginOpen] = useState(false)
 
   const refresh = useCallback(async () => {
     setUser(await loadSessionUser())
+    setKujiSession(getWebAuthSession())
   }, [])
 
   useEffect(() => {
@@ -78,24 +110,45 @@ export default function ArcadeShell({ children }: { children: React.ReactNode })
   }, [refresh])
 
   const handleLogout = () => {
+    // 쿠지허브 세션과 이 앱의 세션은 서로 다른 서버를 보고 있어서 둘 다 지운다.
     clearSession()
+    clearWebAuthSession()
     setUser(null)
+    setKujiSession(null)
     window.location.href = '/'
   }
 
   const canSeePsychology = user?.email?.toLowerCase() === PSYCHOLOGY_ALLOWED_EMAIL
-  const navItems = [
-    ...NAV_ITEMS.filter((item) => !item.adminOnly || user?.userType === 1),
-    ...(canSeePsychology
-      ? [{ path: '/psychology', label: 'MIND', icon: '🔮' } as NavItem]
-      : []),
+  const navGroups: NavGroup[] = [
+    { title: 'KUJIHUB', items: KUJIHUB_ITEMS },
+    {
+      title: 'ARCADE',
+      items: [
+        ...ARCADE_ITEMS.filter((item) => !item.adminOnly || user?.userType === 1),
+        ...(canSeePsychology
+          ? [{ path: '/psychology', label: 'MIND', icon: '🔮' } as NavItem]
+          : []),
+      ],
+    },
   ]
+  const navItems = navGroups.flatMap((group) => group.items)
 
   const activePath = resolveActivePath(pathname, navItems)
-  const userName = user?.nickname?.trim() || user?.email?.split('@')[0] || 'GUEST'
-  const statusLine = user
-    ? `${(user.points ?? 0).toLocaleString()} P`
-    : '로그인이 필요합니다'
+  const signedIn = Boolean(kujiSession || user)
+  const userName =
+    kujiSession?.user.name?.trim() ||
+    user?.nickname?.trim() ||
+    user?.email?.split('@')[0] ||
+    'GUEST'
+  const statusLine = kujiSession
+    ? `${kujiSession.provider.toUpperCase()} 로그인`
+    : user
+      ? `${(user.points ?? 0).toLocaleString()} P`
+      : '로그인이 필요합니다'
+
+  if (isBareRoute(pathname)) {
+    return <>{children}</>
+  }
 
   if (isCabinetRoute(pathname)) {
     return (
@@ -177,39 +230,60 @@ export default function ArcadeShell({ children }: { children: React.ReactNode })
           className="sidebar-nav"
           style={{
             flex: 1,
-            padding: '24px 12px',
+            padding: '16px 12px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '12px',
+            gap: '8px',
             overflowY: 'auto',
           }}
         >
-          {navItems.map((item) => {
-            const isActive = item.path === activePath
-            return (
-              <Link key={item.path} href={item.path} style={{ textDecoration: 'none' }}>
-                <div
-                  className={`arcade-font-pixel ${isActive ? 'glitch-text' : ''}`}
-                  style={{
-                    padding: '14px 16px',
-                    color: isActive ? 'var(--arcade-secondary)' : '#fff',
-                    background: isActive ? 'rgba(255,0,255,0.1)' : 'transparent',
-                    border: isActive
-                      ? '2px solid var(--arcade-secondary)'
-                      : '2px solid transparent',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    fontSize: '0.7rem',
-                    transition: 'all 0.2s',
-                  }}
-                >
-                  <span style={{ fontSize: '1.2rem' }}>{item.icon}</span>
-                  <span>{item.label}</span>
-                </div>
-              </Link>
-            )
-          })}
+          {navGroups.map((group, groupIndex) => (
+            <div
+              key={group.title}
+              style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}
+            >
+              <div
+                className="arcade-font-pixel"
+                style={{
+                  marginTop: groupIndex === 0 ? 0 : '10px',
+                  padding: '0 4px 6px',
+                  borderBottom: '2px solid rgba(255,255,255,0.14)',
+                  color: 'var(--arcade-accent)',
+                  fontSize: '0.5rem',
+                  letterSpacing: '0.08em',
+                }}
+              >
+                {group.title}
+              </div>
+
+              {group.items.map((item) => {
+                const isActive = item.path === activePath
+                return (
+                  <Link key={item.path} href={item.path} style={{ textDecoration: 'none' }}>
+                    <div
+                      className={`arcade-font-pixel ${isActive ? 'glitch-text' : ''}`}
+                      style={{
+                        padding: '10px 14px',
+                        color: isActive ? 'var(--arcade-secondary)' : '#fff',
+                        background: isActive ? 'rgba(255,0,255,0.1)' : 'transparent',
+                        border: isActive
+                          ? '2px solid var(--arcade-secondary)'
+                          : '2px solid transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        fontSize: '0.7rem',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      <span style={{ fontSize: '1.2rem' }}>{item.icon}</span>
+                      <span>{item.label}</span>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          ))}
         </nav>
 
         <div
@@ -220,13 +294,13 @@ export default function ArcadeShell({ children }: { children: React.ReactNode })
           }}
         >
           <ArcadeButton
-            variant={user ? 'primary' : 'accent'}
+            variant={signedIn ? 'primary' : 'accent'}
             size="sm"
             className="arcade-font-pixel"
             style={{ width: '100%', margin: 0 }}
-            onClick={user ? handleLogout : () => setLoginOpen(true)}
+            onClick={signedIn ? handleLogout : () => setLoginOpen(true)}
           >
-            {user ? 'QUIT GAME' : 'INSERT COIN'}
+            {signedIn ? 'QUIT GAME' : 'INSERT COIN'}
           </ArcadeButton>
         </div>
       </aside>
@@ -268,7 +342,7 @@ export default function ArcadeShell({ children }: { children: React.ReactNode })
             <button
               type="button"
               className="layout-usercard"
-              onClick={user ? undefined : () => setLoginOpen(true)}
+              onClick={signedIn ? undefined : () => setLoginOpen(true)}
               style={{
                 minWidth: '240px',
                 maxWidth: '100%',
@@ -281,7 +355,7 @@ export default function ArcadeShell({ children }: { children: React.ReactNode })
                   'linear-gradient(135deg, rgba(0, 0, 0, 0.88), rgba(36, 8, 46, 0.92))',
                 boxShadow: '0 0 24px rgba(255, 0, 255, 0.18)',
                 textAlign: 'left',
-                cursor: user ? 'default' : undefined,
+                cursor: signedIn ? 'default' : undefined,
               }}
             >
               <div
@@ -298,7 +372,7 @@ export default function ArcadeShell({ children }: { children: React.ReactNode })
                   flexShrink: 0,
                 }}
               >
-                {user ? getInitials(userName) : '?'}
+                {signedIn ? getInitials(userName) : '?'}
               </div>
 
               <div
@@ -309,7 +383,7 @@ export default function ArcadeShell({ children }: { children: React.ReactNode })
                   className="arcade-font-pixel"
                   style={{ color: 'var(--arcade-accent)', fontSize: '0.55rem' }}
                 >
-                  {user ? `LV.${user.level ?? 1}` : 'PRESS START'}
+                  {kujiSession ? 'KUJIHUB' : user ? `LV.${user.level ?? 1}` : 'PRESS START'}
                 </div>
                 <div
                   style={{

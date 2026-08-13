@@ -1,6 +1,8 @@
 {
   "compilerOptions": {
-    "target": "es5",
+    // kujihub 에서 옮겨온 코드가 Set 스프레드 등 ES2015 이터레이션을 쓴다.
+    // noEmit 이라 타입체크에만 영향을 주고, 실제 변환은 SWC 가 담당한다.
+    "target": "ES2017",
     "lib": [
       "dom",
       "dom.iterable",

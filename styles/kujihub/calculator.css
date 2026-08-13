@@ -1,0 +1,142 @@
+/* Kuji Calculator v2 — Glitch neon mobile design (claude.ai/design) */
+
+.calcv2 {
+  font-family: 'Galmuri11', monospace;
+  min-height: 100vh;
+  background: radial-gradient(ellipse 130% 50% at 50% 0%, #16163e 0%, #0a0a1e 50%, #05050d 100%);
+  color: #cfd2ff;
+  display: flex;
+  justify-content: center;
+}
+
+.calcv2 *,
+.calcv2 *::before,
+.calcv2 *::after {
+  box-sizing: border-box;
+}
+
+.calcv2 button {
+  font-family: 'Galmuri11', monospace;
+  cursor: pointer;
+}
+.calcv2 button:active {
+  transform: translateY(1px);
+  filter: brightness(1.4);
+}
+
+.calcv2 input {
+  font-family: 'Galmuri11', monospace;
+}
+.calcv2 input:focus {
+  outline: none;
+}
+
+.calcv2-scanlines {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.2) 0px,
+    rgba(0, 0, 0, 0.2) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  animation: calcv2-scanmove 1s steps(6) infinite;
+}
+
+.calcv2-title {
+  margin: 4px 0 0;
+  font-size: 26px;
+  line-height: 1.1;
+  color: #f2f3ff;
+  letter-spacing: 1px;
+  font-weight: 400;
+  white-space: nowrap;
+  animation: calcv2-glitchskew 4s infinite;
+}
+@media (max-width: 380px) {
+  .calcv2-title {
+    font-size: 21px;
+  }
+}
+
+.calcv2-blink {
+  animation: calcv2-blink 1.2s infinite;
+}
+.calcv2-cursor {
+  display: inline-block;
+  width: 7px;
+  height: 11px;
+  background: #8f93d6;
+  margin-left: 4px;
+  vertical-align: -1px;
+  animation: calcv2-blink 1s infinite;
+}
+
+@keyframes calcv2-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+@keyframes calcv2-glitchskew {
+  0%, 90%, 100% {
+    transform: none;
+    text-shadow: 2px 0 rgba(255, 61, 245, 0.7), -2px 0 rgba(79, 245, 232, 0.7);
+  }
+  92% {
+    transform: skewX(-8deg);
+    text-shadow: -3px 0 rgba(255, 61, 245, 0.9), 3px 0 rgba(79, 245, 232, 0.9);
+  }
+  96% {
+    transform: skewX(5deg);
+  }
+}
+
+.calcv2-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 8px;
+  border: 1px solid #2b2b52;
+  background: #1a1a38;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.calcv2-slider:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.calcv2-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  background: #ffd23d;
+  border: 3px solid #0a0a1e;
+  box-shadow: 0 0 10px rgba(255, 210, 61, 0.6);
+  cursor: pointer;
+}
+.calcv2-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 0;
+  background: #ffd23d;
+  border: 3px solid #0a0a1e;
+  box-shadow: 0 0 10px rgba(255, 210, 61, 0.6);
+  cursor: pointer;
+}
+.calcv2-slider:disabled::-webkit-slider-thumb {
+  box-shadow: none;
+}
+.calcv2-slider:disabled::-moz-range-thumb {
+  box-shadow: none;
+}
+
+@keyframes calcv2-scanmove {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 6px; }
+}

@@ -1,6 +1,23 @@
+/**
+ * kujihub 웹이 쓰는 API 서버는 앱(React Native)과 공유하는 별도 서버라
+ * 이 프로젝트로 옮겨오지 않는다.
+ *
+ * 서버가 http 로만 열려 있어서 https 로 배포된 이 사이트에서 브라우저가
+ * 직접 부르면 mixed content 로 차단된다. 그래서 /kujihub-api 로 프록시한다.
+ */
+const { KUJIHUB_API_ORIGIN, CONTENT_SECURITY_POLICY } = require('./lib/csp')
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  async rewrites() {
+    return [
+      {
+        source: '/kujihub-api/:path*',
+        destination: `${KUJIHUB_API_ORIGIN}/:path*`,
+      },
+    ]
+  },
   compiler: {
     styledComponents: true,
   },
@@ -44,7 +61,8 @@ const nextConfig = {
           },
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://pagead2.googlesyndication.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; img-src 'self' data: https: blob:; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; connect-src 'self' https: wss: ws://localhost:3001 ws://localhost:* wss://*.supabase.co https://*.supabase.co;"
+            // 페이지 응답은 proxy.ts 가 같은 값으로 덮어쓴다(lib/csp.js 주석 참고).
+            value: CONTENT_SECURITY_POLICY
           }
         ]
       }

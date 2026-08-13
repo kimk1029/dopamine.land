@@ -186,6 +186,24 @@
   100% { filter: brightness(1); }
 }
 
+/* ── 픽셀 스피너 애니메이션 ─────────────────────────────────── */
+@keyframes pixelSpinFade {
+  0%   { opacity: 1;    box-shadow: 0 0 6px var(--arcade-primary); }
+  12%  { opacity: 0.75; }
+  25%  { opacity: 0.5;  box-shadow: none; }
+  50%  { opacity: 0.15; }
+  75%  { opacity: 0.08; }
+  100% { opacity: 1;    box-shadow: 0 0 6px var(--arcade-primary); }
+}
+@keyframes pixelScan {
+  0%   { width: 0%; }
+  100% { width: 100%; }
+}
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
 /* Mobile Navigation Bar */
 .mobile-nav {
   display: none;
@@ -227,6 +245,13 @@
   display: none !important;
 }
 
+.community-compose-fab {
+  position: fixed;
+  right: 20px;
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  z-index: 120;
+}
+
 .desktop-only {
   display: flex !important; /* or block depending on context, assuming mostly flex for our buttons */
 }
@@ -238,6 +263,8 @@
 
 .page-shell {
   width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 .layout-userbar {
@@ -255,6 +282,18 @@
 
 .signal-feed-grid {
   align-items: stretch;
+}
+
+.kuji-wallet-box {
+  min-width: 0;
+}
+
+.kuji-wallet-value {
+  white-space: nowrap;
+}
+
+.home-overview-stats {
+  padding-top: 0;
 }
 
 /* Responsive Grid Adjustments */
@@ -330,7 +369,9 @@
   .main-content {
     margin-left: 0 !important;
     width: 100% !important;
+    max-width: 100vw !important;
     padding: 16px 12px 92px 12px !important; /* Extra padding for bottom nav */
+    overflow-x: hidden !important;
   }
 
   .mobile-nav {
@@ -359,6 +400,15 @@
     margin-inline: 0;
   }
 
+  .home-page-header {
+    margin-bottom: 8px !important;
+  }
+
+  .home-overview-stats {
+    margin-top: 0 !important;
+    padding-top: 28px !important;
+  }
+
   .layout-userbar {
     margin-bottom: 16px !important;
   }
@@ -383,6 +433,53 @@
     gap: 8px !important;
   }
 
+  .kuji-list-header {
+    align-items: stretch !important;
+    gap: 14px !important;
+    margin-bottom: 24px !important;
+  }
+
+  .kuji-wallet-box {
+    width: 100%;
+    margin: 0 !important;
+  }
+
+  .kuji-wallet-box .arcade-box-v2 {
+    width: 100%;
+    margin: 0 !important;
+    padding: 10px 12px !important;
+  }
+
+  .kuji-wallet-value {
+    white-space: nowrap;
+    word-break: normal;
+    font-size: 1rem !important;
+    line-height: 1.1;
+    text-align: center;
+  }
+
+  .kuji-detail-header {
+    margin-bottom: 14px !important;
+    padding-top: 8px;
+  }
+
+  .kuji-detail-shell {
+    padding-top: 4px;
+  }
+
+  .kuji-purchase-console .arcade-box-content {
+    overflow: visible;
+  }
+
+  .kuji-detail-top-grid {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+
+  .kuji-purchase-console .arcade-box-content {
+    overflow: visible;
+  }
+
   /* Fix for detail page sidebars */
   .detail-layout, .profile-dashboard, .community-layout {
     grid-template-columns: 1fr !important;
@@ -390,7 +487,7 @@
   }
 
   .overview-stats-grid .arcade-box-v2 {
-    padding: 10px 8px !important;
+    padding: 24px 8px 10px !important;
     margin: 4px !important;
   }
 
@@ -489,9 +586,43 @@
     gap: 10px !important;
   }
 
-  .mobile-only {
+  .community-compose-fab {
     right: 16px !important;
-    bottom: 78px !important;
+    bottom: calc(82px + env(safe-area-inset-bottom)) !important;
+  }
+
+  /* ── Mobile overflow prevention ─────────────────────────────── */
+
+  /* Images never exceed container width */
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Top-level page containers must not exceed viewport */
+  .animate-in {
+    min-width: 0;
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+
+  /* Arcade box content shrinks inside flex/grid */
+  .arcade-box-content {
+    min-width: 0;
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* Page header: wrap buttons on narrow screens */
+  .page-header > div {
+    flex-wrap: wrap;
+  }
+
+  /* Multiple buttons in a row should each take full width */
+  .page-header > div .arcade-btn-v2 {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0 !important;
   }
 }
 
@@ -521,8 +652,16 @@
     gap: 6px !important;
   }
 
+  .home-overview-stats {
+    padding-top: 34px !important;
+  }
+
+  .kuji-wallet-value {
+    font-size: 0.92rem !important;
+  }
+
   .overview-stats-grid .arcade-box-v2 {
-    padding: 9px 6px !important;
+    padding: 22px 6px 9px !important;
   }
 
   .overview-stats-grid .arcade-box-label {
