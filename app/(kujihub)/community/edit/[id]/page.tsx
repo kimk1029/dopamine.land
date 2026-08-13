@@ -1,5 +1,6 @@
-import { CommunityPostFormPage } from '@/components/kujihub/pages/CommunityPostFormPage'
+import { redirect } from 'next/navigation'
 
+// 수정은 /comm 상세 화면의 EDIT_MESSAGE 모달로 통합되었다.
 export default function Page() {
-  return <CommunityPostFormPage />
+  redirect('/comm')
 }

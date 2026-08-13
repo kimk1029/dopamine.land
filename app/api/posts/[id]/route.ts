@@ -75,6 +75,8 @@ export async function GET(
         likes: post._count.likes,
         liked: userId ? post.likes.length > 0 : false,
         views: post.views,
+        category: post.category,
+        is_notice: post.isNotice,
       },
       { status: 200 }
     )

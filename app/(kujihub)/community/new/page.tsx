@@ -1,5 +1,6 @@
-import { CommunityPostFormPage } from '@/components/kujihub/pages/CommunityPostFormPage'
+import { redirect } from 'next/navigation'
 
+// 글쓰기는 /comm의 NEW_MESSAGE 폼으로 통합되었다.
 export default function Page() {
-  return <CommunityPostFormPage />
+  redirect('/comm')
 }

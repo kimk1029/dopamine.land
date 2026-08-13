@@ -1,6 +1,6 @@
-# Dopamine Ground
+# DOPAMINE.LAND
 
-Dopamine Ground - Your Ultimate Gaming Platform
+DOPAMINE.LAND - Your Ultimate Gaming Platform
 
 ## 기능
 

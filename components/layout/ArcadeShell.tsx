@@ -39,7 +39,7 @@ const KUJIHUB_ITEMS: NavItem[] = [
   { path: '/calc', label: 'CALC', icon: '🧮' },
   { path: '/media', label: 'MEDIA', icon: '📺' },
   { path: '/feed', label: 'FEED', icon: '📡' },
-  { path: '/community', label: 'COMM', icon: '👥', mobile: true },
+  { path: '/comm', label: 'COMM', icon: '👥', mobile: true },
   { path: '/profile', label: 'MY', icon: '👤', mobile: true },
 ]
 
@@ -51,9 +51,7 @@ const ARCADE_ITEMS: NavItem[] = [
   { path: '/arcade', label: 'ARCADE', icon: '🎪' },
   { path: '/game', label: 'GAME', icon: '🕹️', mobile: true },
   { path: '/leaderboard', label: 'RANK', icon: '🏆' },
-  { path: '/board', label: 'BOARD', icon: '📋' },
   { path: '/charge', label: 'CHARGE', icon: '⚡' },
-  { path: '/notice', label: 'NOTICE', icon: '📢' },
   { path: '/arcade/profile', label: 'POINT', icon: '🪙' },
   { path: '/admin', label: 'ADMIN', icon: '🛡️', adminOnly: true },
 ]
@@ -120,7 +118,7 @@ export default function ArcadeShell({ children }: { children: React.ReactNode })
 
   const canSeePsychology = user?.email?.toLowerCase() === PSYCHOLOGY_ALLOWED_EMAIL
   const navGroups: NavGroup[] = [
-    { title: 'KUJIHUB', items: KUJIHUB_ITEMS },
+    { title: 'MAIN', items: KUJIHUB_ITEMS },
     {
       title: 'ARCADE',
       items: [
@@ -219,9 +217,9 @@ export default function ArcadeShell({ children }: { children: React.ReactNode })
             />
             <span
               className="arcade-font-pixel"
-              style={{ color: 'var(--arcade-primary)', fontSize: '1rem' }}
+              style={{ color: 'var(--arcade-primary)', fontSize: '0.72rem' }}
             >
-              KUJIHUB
+              DOPAMINE.LAND
             </span>
           </Link>
         </div>
@@ -327,14 +325,14 @@ export default function ArcadeShell({ children }: { children: React.ReactNode })
           marginLeft: '280px',
           width: 'calc(100% - 280px)',
           minHeight: '100vh',
-          padding: '40px',
+          padding: '24px',
           position: 'relative',
           zIndex: 1,
           boxSizing: 'border-box',
           overflowX: 'hidden',
         }}
       >
-        <div className="page-shell" style={{ maxWidth: '1400px', margin: '0 auto' }}>
+        <div className="page-shell" style={{ width: '100%' }}>
           <div
             className="layout-userbar"
             style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '24px' }}
@@ -383,7 +381,7 @@ export default function ArcadeShell({ children }: { children: React.ReactNode })
                   className="arcade-font-pixel"
                   style={{ color: 'var(--arcade-accent)', fontSize: '0.55rem' }}
                 >
-                  {kujiSession ? 'KUJIHUB' : user ? `LV.${user.level ?? 1}` : 'PRESS START'}
+                  {kujiSession ? 'DOPAMINE.LAND' : user ? `LV.${user.level ?? 1}` : 'PRESS START'}
                 </div>
                 <div
                   style={{
