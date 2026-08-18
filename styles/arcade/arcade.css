@@ -267,8 +267,20 @@
   overflow-x: hidden;
 }
 
+/*
+ * 프로필 카드 자리.
+ * 데스크톱은 사이드바 상단(.sidebar-profile)이 담당하므로 본문 상단 카드는
+ * 숨기고, 사이드바가 사라지는 768px 이하에서만 되살린다.
+ */
 .layout-userbar {
   width: 100%;
+  display: none;
+}
+
+.sidebar-profile .layout-usercard:focus-visible,
+.layout-userbar .layout-usercard:focus-visible {
+  outline: 2px solid var(--arcade-accent);
+  outline-offset: 2px;
 }
 
 .overview-stats-grid .arcade-box-v2 {
@@ -410,7 +422,8 @@
   }
 
   .layout-userbar {
-    margin-bottom: 16px !important;
+    display: block;
+    margin-bottom: 16px;
   }
 
   .layout-usercard {

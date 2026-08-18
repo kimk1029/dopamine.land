@@ -1,0 +1,124 @@
+/* /map (쿠지샵 지도) 전용 스타일. 다른 화면에는 영향이 없도록 접두사를 붙였다. */
+
+.kuji-map-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 20px;
+}
+
+.kuji-map-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.kuji-map-body {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 16px;
+  /* 지도가 "크게" 보이는 게 이 화면의 목적이라 뷰포트 기준으로 잡는다. */
+  height: clamp(460px, calc(100vh - 300px), 820px);
+}
+
+.kuji-map-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 3px solid var(--arcade-secondary);
+  background: rgba(0, 0, 0, 0.72);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.kuji-map-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.kuji-map-list-item:hover {
+  border-color: var(--arcade-primary);
+}
+
+.kuji-map-list-badge {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 2px solid;
+  background: rgba(0, 0, 0, 0.8);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.kuji-map-canvas {
+  position: relative;
+  min-height: 0;
+  border: 4px solid var(--arcade-primary);
+  background: rgba(0, 0, 0, 0.85);
+  overflow: hidden;
+}
+
+.kuji-map-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.88);
+  z-index: 5;
+}
+
+@media (max-width: 768px) {
+  .kuji-map-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  /*
+   * .page-header 규칙이 자식을 width:100% 로 만드는데 ArcadeBox 는 모바일에서
+   * margin:6px 를 갖는다. 둘이 겹치면 100%+12px 이 되어 가로 스크롤이 생긴다.
+   */
+  .kuji-map-count.arcade-box-v2 {
+    width: 100%;
+    margin: 0 !important;
+  }
+
+  /* 지역 셀렉트가 칩 줄 옆에 붙으면 화면 밖으로 밀려난다. */
+  .kuji-map-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .kuji-map-filters select {
+    width: 100%;
+  }
+
+  .kuji-map-body {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+  }
+
+  /* 모바일에선 지도가 먼저 보여야 한다. 목록은 그 아래로 내린다. */
+  .kuji-map-canvas {
+    order: -1;
+    height: 56vh;
+    min-height: 320px;
+  }
+
+  .kuji-map-list {
+    max-height: 320px;
+  }
+}

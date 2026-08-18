@@ -36,6 +36,7 @@ interface NavGroup {
 const KUJIHUB_ITEMS: NavItem[] = [
   { path: '/dashboard', label: 'HOME', icon: '🏠', mobile: true },
   { path: '/kuji', label: 'KUJI', icon: '🎰', mobile: true },
+  { path: '/map', label: 'MAP', icon: '🗺️', mobile: true },
   { path: '/calc', label: 'CALC', icon: '🧮' },
   { path: '/media', label: 'MEDIA', icon: '📺' },
   { path: '/feed', label: 'FEED', icon: '📡' },
@@ -61,6 +62,98 @@ const PSYCHOLOGY_ALLOWED_EMAIL = 'kimk1029@naver.com'
 const getInitials = (name: string) => {
   const trimmed = name.trim()
   return trimmed ? trimmed.slice(0, 2).toUpperCase() : 'U'
+}
+
+interface UserCardProps {
+  /** sidebar = 데스크톱 사이드바 상단, mobile = 사이드바가 숨는 폭에서의 대체 카드 */
+  variant: 'sidebar' | 'mobile'
+  signedIn: boolean
+  userName: string
+  badge: string
+  statusLine: string
+  onClick?: () => void
+}
+
+/**
+ * 프로필 카드. 데스크톱에서는 사이드바 맨 위에, 사이드바가 사라지는
+ * 768px 이하에서는 본문 상단에 같은 내용이 뜬다(표시 여부는 CSS 담당).
+ */
+function UserCard({ variant, signedIn, userName, badge, statusLine, onClick }: UserCardProps) {
+  const compact = variant === 'sidebar'
+  const avatarSize = compact ? 42 : 52
+
+  return (
+    <button
+      type="button"
+      className={`layout-usercard layout-usercard-${variant}`}
+      onClick={onClick}
+      style={{
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        gap: compact ? '10px' : '14px',
+        padding: compact ? '10px 12px' : '14px 16px',
+        border: '3px solid var(--arcade-secondary)',
+        background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.88), rgba(36, 8, 46, 0.92))',
+        boxShadow: '0 0 24px rgba(255, 0, 255, 0.18)',
+        textAlign: 'left',
+        cursor: signedIn ? 'default' : 'pointer',
+      }}
+    >
+      <div
+        style={{
+          width: `${avatarSize}px`,
+          height: `${avatarSize}px`,
+          borderRadius: '50%',
+          border: '2px solid var(--arcade-primary)',
+          display: 'grid',
+          placeItems: 'center',
+          color: 'var(--arcade-primary)',
+          fontWeight: 900,
+          fontSize: compact ? '0.85rem' : '1rem',
+          background: 'rgba(6, 10, 16, 0.92)',
+          flexShrink: 0,
+        }}
+      >
+        {signedIn ? getInitials(userName) : '?'}
+      </div>
+
+      <div
+        className="layout-usercopy"
+        style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}
+      >
+        <div
+          className="arcade-font-pixel"
+          style={{ color: 'var(--arcade-accent)', fontSize: compact ? '0.45rem' : '0.55rem' }}
+        >
+          {badge}
+        </div>
+        <div
+          style={{
+            color: '#fff',
+            fontWeight: 900,
+            fontSize: compact ? '0.86rem' : '1rem',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {userName}
+        </div>
+        <div
+          style={{
+            color: 'rgba(255,255,255,0.72)',
+            fontSize: compact ? '0.7rem' : '0.8rem',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {statusLine}
+        </div>
+      </div>
+    </button>
+  )
 }
 
 /**
@@ -142,6 +235,11 @@ export default function ArcadeShell({ children }: { children: React.ReactNode })
     : user
       ? `${(user.points ?? 0).toLocaleString()} P`
       : '로그인이 필요합니다'
+  const userBadge = kujiSession
+    ? 'DOPAMINE.LAND'
+    : user
+      ? `LV.${user.level ?? 1}`
+      : 'PRESS START'
 
   if (isBareRoute(pathname)) {
     return <>{children}</>
@@ -221,6 +319,20 @@ export default function ArcadeShell({ children }: { children: React.ReactNode })
               DOPAMINE.LAND
             </span>
           </Link>
+        </div>
+
+        <div
+          className="sidebar-profile"
+          style={{ padding: '14px 16px', borderBottom: '4px solid var(--arcade-secondary)' }}
+        >
+          <UserCard
+            variant="sidebar"
+            signedIn={signedIn}
+            userName={userName}
+            badge={userBadge}
+            statusLine={statusLine}
+            onClick={signedIn ? undefined : () => setLoginOpen(true)}
+          />
         </div>
 
         <nav
@@ -332,81 +444,17 @@ export default function ArcadeShell({ children }: { children: React.ReactNode })
         }}
       >
         <div className="page-shell" style={{ width: '100%' }}>
-          <div
-            className="layout-userbar"
-            style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '24px' }}
-          >
-            <button
-              type="button"
-              className="layout-usercard"
+          {/* 데스크톱에서는 사이드바 상단이 프로필 자리다. 사이드바가 숨는
+              폭에서만 이 카드가 CSS 로 나타난다. */}
+          <div className="layout-userbar">
+            <UserCard
+              variant="mobile"
+              signedIn={signedIn}
+              userName={userName}
+              badge={userBadge}
+              statusLine={statusLine}
               onClick={signedIn ? undefined : () => setLoginOpen(true)}
-              style={{
-                minWidth: '240px',
-                maxWidth: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '14px',
-                padding: '14px 16px',
-                border: '3px solid var(--arcade-secondary)',
-                background:
-                  'linear-gradient(135deg, rgba(0, 0, 0, 0.88), rgba(36, 8, 46, 0.92))',
-                boxShadow: '0 0 24px rgba(255, 0, 255, 0.18)',
-                textAlign: 'left',
-                cursor: signedIn ? 'default' : undefined,
-              }}
-            >
-              <div
-                style={{
-                  width: '52px',
-                  height: '52px',
-                  borderRadius: '50%',
-                  border: '2px solid var(--arcade-primary)',
-                  display: 'grid',
-                  placeItems: 'center',
-                  color: 'var(--arcade-primary)',
-                  fontWeight: 900,
-                  background: 'rgba(6, 10, 16, 0.92)',
-                  flexShrink: 0,
-                }}
-              >
-                {signedIn ? getInitials(userName) : '?'}
-              </div>
-
-              <div
-                className="layout-usercopy"
-                style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}
-              >
-                <div
-                  className="arcade-font-pixel"
-                  style={{ color: 'var(--arcade-accent)', fontSize: '0.55rem' }}
-                >
-                  {kujiSession ? 'DOPAMINE.LAND' : user ? `LV.${user.level ?? 1}` : 'PRESS START'}
-                </div>
-                <div
-                  style={{
-                    color: '#fff',
-                    fontWeight: 900,
-                    fontSize: '1rem',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {userName}
-                </div>
-                <div
-                  style={{
-                    color: 'rgba(255,255,255,0.72)',
-                    fontSize: '0.8rem',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {statusLine}
-                </div>
-              </div>
-            </button>
+            />
           </div>
 
           {children}
