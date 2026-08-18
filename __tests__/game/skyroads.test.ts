@@ -133,33 +133,44 @@ describe('SkyRoads 원작 물리', () => {
   it('행성을 넘길 때마다 최고속(오버드라이브)이 올라간다', () => {
     expect(overdrive(0)).toBeCloseTo(1, 6)
     expect(overdrive(3)).toBeGreaterThan(overdrive(0))
-    expect(overdrive(20)).toBeCloseTo(1.9, 6)   // 상한
+    expect(overdrive(20)).toBeCloseTo(1.5, 6)   // 상한
     const p0 = runtimePlanet(0)
     const p5 = runtimePlanet(5)
-    expect(p5.maxZVel!).toBeGreaterThan(p0.maxZVel! * 1.4)
+    // 기본 배율이 얹혀 원작보다 빠르게 출발하고, 행성을 넘길수록 더 빨라진다
+    expect(p0.maxZVel!).toBeGreaterThan((0x2aaa / 0x10000) * 1.5)
+    expect(p5.maxZVel!).toBeGreaterThan(p0.maxZVel! * 1.3)
     // 가속도 같은 비율이라 최고속까지 걸리는 프레임 수는 유지된다
     expect(p5.maxZVel! / p5.zAccel!).toBeCloseTo(p0.maxZVel! / p0.zAccel!, 6)
 
-    // 실제로 더 빨리 달린다
-    const far = (() => {
+    // 실제로 더 멀리 나아간다
+    const travelled = (p: ReturnType<typeof runtimePlanet>) => {
       const road = new EndlessRoad(5)
       road.ensure(400)
-      const ship = new Ship({ vz: p5.maxZVel })
+      const ship = new Ship({ vz: p.maxZVel })
       const exp = ship.clone()
       const z0 = ship.v.z
-      for (let f = 0; f < 30; f++) ship.update(road, p5, exp, { turn: 0, accel: 1, jump: false }, {})
+      for (let f = 0; f < 20; f++) ship.update(road, p, exp, { turn: 0, accel: 1, jump: false }, {})
       return ship.v.z - z0
-    })()
-    const near = (() => {
-      const road = new EndlessRoad(5)
-      road.ensure(400)
-      const ship = new Ship({ vz: p0.maxZVel })
+    }
+    expect(travelled(p5)).toBeGreaterThan(travelled(p0) * 1.3)
+  })
+
+  it('속도를 올려도 좌우 이동 속도는 조종 가능한 범위로 눌린다', () => {
+    const lateral = (p: ReturnType<typeof runtimePlanet>) => {
+      const road = new EndlessRoad(1)
+      road.ensure(60)
+      const ship = new Ship({ vz: p.maxZVel })
       const exp = ship.clone()
-      const z0 = ship.v.z
-      for (let f = 0; f < 30; f++) ship.update(road, p0, exp, { turn: 0, accel: 1, jump: false }, {})
-      return ship.v.z - z0
-    })()
-    expect(far).toBeGreaterThan(near * 1.4)
+      const x0 = ship.v.x
+      for (let f = 0; f < 20; f++) ship.update(road, p, exp, { turn: 1, accel: 0, jump: false }, {})
+      return (ship.v.x - x0) / 20      // 프레임당 좌우 이동
+    }
+    const l0 = lateral(runtimePlanet(0))
+    const l9 = lateral(runtimePlanet(9))
+    // 전진속도는 1.5배가 되지만 좌우 이동은 거의 그대로여야 조종이 된다
+    expect(l9 / l0).toBeLessThan(1.15)
+    // 도로 폭(322)을 가로지르는 데 1초 이상은 걸려야 한다 (36Hz)
+    expect(322 / (l9 * 36)).toBeGreaterThan(1)
   })
 
   it('조향은 전진속도에 비례한다 (정지 상태에서는 거의 못 돈다)', () => {

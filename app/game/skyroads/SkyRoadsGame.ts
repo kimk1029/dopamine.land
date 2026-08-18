@@ -40,7 +40,13 @@ const ZACCEL = 0x4B / 0x10000         // 스로틀 가감속
  * 같은 비율로 끌어올려(=가속에 걸리는 시간은 유지) 갈수록 빨라지게 한다.
  */
 const OVERDRIVE_PER_PLANET = 0.11
-const OVERDRIVE_MAX = 0.9
+const OVERDRIVE_MAX = 0.5
+
+/**
+ * 원작 최고속(6칸/초)은 무한 러너로는 답답해서 기본 배율을 얹는다.
+ * 물리 관계식은 그대로 두고 최고속/가속/패드 효과만 같은 비율로 키운다.
+ */
+const SPEED_BOOST = 1.9
 export function overdrive(planetIndex: number): number {
   return 1 + Math.min(OVERDRIVE_MAX, Math.max(0, planetIndex) * OVERDRIVE_PER_PLANET)
 }
@@ -88,7 +94,7 @@ const CAM_H = 69                      // 도로 윗면 위 카메라 높이 (1.5
 const CAM_Y = GROUND_Y + CAM_H        // 149
 const CAM_BACK = 138                  // 우주선 뒤 3칸
 const NEAR_Z = 12                     // 근평면
-const VIEW_ROWS = 34                  // 앞쪽으로 그리는 칸 수
+const VIEW_ROWS = 46                  // 앞쪽으로 그리는 칸 수 (속도가 빨라진 만큼 시야도 넓힌다)
 const FAR_FACE_Z = 760                // 이보다 멀면 윗면만 그린다 (측면은 1px 미만)
 const DASH_TOP = 111                  // 대시보드(콕핏 프레임 포함) 최상단
 const SCENE_BOTTOM = 146              // 3D 화면을 그리는 마지막 스캔라인+1
@@ -269,9 +275,10 @@ export class EndlessRoad {
 
   constructor(seed: number) {
     this.rnd = mulberry32(seed)
-    // 출발 구간: 원작 로드 시작처럼 넓고 평평하게. 최고속까지 약 146프레임(≈24칸)이
-    // 걸리므로 첫 장애물 전에 충분히 가속할 활주로를 준다.
-    this.pushRows(this.plain(26, 7))
+    // 출발 활주로. 최고속까지 약 146프레임 걸리므로 가속할 여유를 주되,
+    // 곧바로 원작다운 5칸 폭으로 좁힌다.
+    this.pushRows(this.plain(10, 7))
+    this.pushRows(this.plain(22, 5))
   }
 
   planetAt(row: number): Planet {
@@ -280,7 +287,7 @@ export class EndlessRoad {
 
   /** 오버드라이브까지 반영한 이 지점의 최고속 */
   maxZVelAt(row: number): number {
-    return MAX_ZVEL * overdrive(this.planetIndexAt(row))
+    return MAX_ZVEL * SPEED_BOOST * overdrive(this.planetIndexAt(row))
   }
   planetIndexAt(row: number): number {
     return Math.floor(Math.max(0, row) / PLANET_ROWS)
@@ -398,11 +405,32 @@ export class EndlessRoad {
     return Math.max(1, Math.min(want, limit))
   }
 
+  /**
+   * 원작 로드는 대부분 3~5칸 폭이고 7칸을 다 깔아둔 구간은 드물다.
+   * 패턴 사이 휴식 구간 폭도 그에 맞춰 좁게 잡고, 난이도가 오르면 더 좁아진다.
+   */
+  private restW(): number {
+    return 5
+  }
+
+  /**
+   * 속도가 오르면 같은 칸 수가 시간상으로는 짧아진다.
+   * 구간 길이에 이 배율을 곱해 조작할 시간을 일정하게 유지한다.
+   */
+  private pace(row: number): number {
+    return this.maxZVelAt(row) / (MAX_ZVEL * SPEED_BOOST)
+  }
+  private paced(row: number, len: number): number {
+    return Math.max(1, Math.round(len * this.pace(row)))
+  }
+
   /** 이 지점의 중력·최고속으로 넘을 수 있는 최대 공백 칸 수 */
   maxGap(row: number): number {
     const g = Math.abs(gravityAccel(this.planetAt(row).gravity))
     const airFrames = (2 * JUMP_VY) / g
-    return Math.max(1, Math.min(5, Math.floor(airFrames * this.maxZVelAt(row)) - 1))
+    // 이론상 한계(airFrames * maxZ)를 그대로 쓰면 최고속 + 완벽한 타이밍이라야 넘는다.
+    // 실수할 여지를 남기려고 절반 정도로 줄이고 3칸을 상한으로 둔다.
+    return Math.max(1, Math.min(3, Math.floor(airFrames * this.maxZVelAt(row) * 0.55)))
   }
 
   private canJump(row: number): boolean {
@@ -419,12 +447,12 @@ export class EndlessRoad {
     const push = (rs: Cell[][]) => { for (const x of rs) rows.push(x) }
 
     // 행성 진입 직후 / 보급이 급할 때는 안전 구간
-    if (planetProgress < 0.06) return this.plain(9, 7)
+    if (planetProgress < 0.06) return this.plain(9, 5)
     if (row0 - this.lastRefillRow > 34) { push(this.supply(row0)); return rows }
 
     // [가중치, 등장 시작 칸, 생성기] — 거리에 따라 패턴을 하나씩 풀어준다
     const pool: Array<[number, number, () => Cell[][]]> = [
-      [0.9, 0, () => this.plain(5 + Math.floor(r() * 5), 5 + Math.floor(r() * 3))],
+      [0.9, 0, () => this.plain(5 + Math.floor(r() * 5), 3 + 2 * Math.floor(r() * 2))],
       [0.5, 0, () => this.supply(row0)],
       [0.9, 30, () => this.narrow(row0, diff)],
       [1.0, 50, () => this.gaps(row0, diff)],
@@ -441,8 +469,8 @@ export class EndlessRoad {
       [0.45, 280, () => this.split(row0, diff)],
       [0.5, 310, () => this.killLane(row0, diff)],
       [0.4 + diff * 0.4, 350, () => this.staircase(row0, diff)],
-      [0.35 + diff * 0.6, 420, () => this.minefield(row0, diff)],
-      [0.4 + diff * 0.5, 520, () => this.weave(row0, diff)],
+      [0.35 + diff * 0.25, 420, () => this.minefield(row0, diff)],
+      [0.4 + diff * 0.3, 520, () => this.weave(row0, diff)],
     ]
     let total = 0
     for (const [w, minRow] of pool) if (row0 >= minRow) total += w
@@ -452,10 +480,10 @@ export class EndlessRoad {
       pick -= w
       if (pick <= 0) { push(fn()); break }
     }
-    if (rows.length === 0) push(this.plain(8, 7))
+    if (rows.length === 0) push(this.plain(8, 5))
     // 패턴 사이에 짧은 착지 구간을 넣어 원작의 "숨 돌리는" 리듬을 만든다.
     // 난이도가 오를수록 이 여유가 사라진다.
-    push(this.plain(Math.max(1, 3 - Math.round(diff * 2)) + Math.floor(r() * 3), 7))
+    push(this.plain(Math.max(1, 3 - Math.round(diff * 2)) + Math.floor(r() * 3), this.restW()))
     return rows
   }
 
@@ -464,7 +492,7 @@ export class EndlessRoad {
   private narrow(row0: number, diff: number): Cell[][] {
     const r = this.rnd
     const len = 10 + Math.floor(r() * 14)
-    const width = Math.max(diff > 0.45 ? 1 : 3, 5 - Math.floor(diff * 2 + r() * 2))
+    const width = Math.max(diff > 0.75 ? 1 : 3, 5 - 2 * Math.floor(diff + r()))
     const rows: Cell[][] = []
     let center = 3
     let dir = r() < 0.5 ? -1 : 1
@@ -488,13 +516,13 @@ export class EndlessRoad {
     const gmax = this.maxGap(row0)
     for (let k = 0; k < n; k++) {
       const padLen = 4 - Math.floor(diff * 2) + Math.floor(r() * 3)
-      const w = 7 - Math.floor(r() * (2 + diff * 3))
+      const w = 5 - 2 * Math.floor(r() * (1 + diff))
       for (const rr of this.plainAt(row0 + rows.length, padLen, w)) rows.push(rr)
       const gapRow = row0 + rows.length
       const gap = row0 < 200 ? 1 : this.safeGap(gapRow, 1 + Math.floor(r() * gmax))
       for (let i = 0; i < gap; i++) rows.push(this.mkRow(row0 + rows.length, [false, false, false, false, false, false, false]))
     }
-    for (const rr of this.plainAt(row0 + rows.length, 5, 7)) rows.push(rr)
+    for (const rr of this.plainAt(row0 + rows.length, this.paced(row0, 5), this.restW())) rows.push(rr)
     return rows
   }
 
@@ -516,7 +544,7 @@ export class EndlessRoad {
     let center = 3
     const n = 3 + Math.floor(r() * 3)
     for (let k = 0; k < n; k++) {
-      const w = Math.max(1, 3 - Math.floor(diff * 2))
+      const w = diff > 0.75 ? 1 : 3
       const len = 2 + Math.floor(r() * 3)
       const half = (Math.max(1, w) - 1) / 2
       for (let i = 0; i < len; i++) {
@@ -524,34 +552,38 @@ export class EndlessRoad {
         for (let c = 0; c < 7; c++) cols.push(Math.abs(c - center) <= half)
         rows.push(this.mkRow(row0 + rows.length, cols))
       }
-      const gap = this.safeGap(row0 + rows.length, 1 + Math.floor(r() * gmax))
+      const want = w <= 1 ? 1 : 1 + Math.floor(r() * gmax)
+      const gap = this.safeGap(row0 + rows.length, want)
       for (let i = 0; i < gap; i++) rows.push(this.mkRow(row0 + rows.length, [false, false, false, false, false, false, false]))
       center += (r() < 0.5 ? -1 : 1) * (1 + Math.floor(r() * 2))
       center = Math.max(1, Math.min(5, center))
     }
-    for (const rr of this.plainAt(row0 + rows.length, 4, 7)) rows.push(rr)
+    for (const rr of this.plainAt(row0 + rows.length, this.paced(row0, 4), this.restW())) rows.push(rr)
     return rows
   }
 
   private slalom(row0: number, diff: number): Cell[][] {
     const r = this.rnd
     const rows: Cell[][] = []
-    const seg = 4 + Math.floor(r() * 3)
+    // 진입/게이트 사이는 반드시 전 폭. 좁은 도로에서 먼 게이트가 나오면 도달할 방법이 없다.
+    for (const rr of this.plainAt(row0, this.paced(row0, 3), 7)) rows.push(rr)
+    const seg = this.paced(row0, 4)
+    const rest = this.paced(row0, 4)
     const n = 3 + Math.floor(r() * 3)
-    const openW = diff > 0.7 ? 1 : diff > 0.35 ? 2 : 3
+    const openW = diff > 0.6 ? 2 : 3
     let open = Math.floor(r() * (8 - openW))
     for (let k = 0; k < n; k++) {
       for (let i = 0; i < seg; i++) {
         const row: Cell[] = []
         for (let c = 0; c < 7; c++) {
           const isOpen = c >= open && c < open + openW
-          if (isOpen) row.push(this.cell(this.lane(row0 + rows.length, c)))
-          else row.push(this.cell(this.lane(row0 + rows.length, c), 2, 0))
+          row.push(this.cell(this.lane(row0 + rows.length, c), isOpen ? 0 : 2, 0))
         }
         rows.push(row)
       }
+      // 다음 게이트는 최대 두 칸까지만 옮긴다 (남은 시간 안에 붙을 수 있게)
       open = Math.max(0, Math.min(7 - openW, open + (r() < 0.5 ? -1 : 1) * (1 + Math.floor(r() * 2))))
-      for (const rr of this.plainAt(row0 + rows.length, 2, 7)) rows.push(rr)
+      for (const rr of this.plainAt(row0 + rows.length, rest, 7)) rows.push(rr)
     }
     return rows
   }
@@ -571,7 +603,7 @@ export class EndlessRoad {
         rows.push(row)
       }
     }
-    for (const rr of this.plainAt(row0 + rows.length, 4, 7)) rows.push(rr)
+    for (const rr of this.plainAt(row0 + rows.length, this.paced(row0, 4), this.restW())) rows.push(rr)
     return rows
   }
 
@@ -591,25 +623,34 @@ export class EndlessRoad {
       }
       rows.push(row)
     }
-    for (const rr of this.plainAt(row0 + rows.length, 4, 7)) rows.push(rr)
+    for (const rr of this.plainAt(row0 + rows.length, this.paced(row0, 4), this.restW())) rows.push(rr)
     return rows
   }
 
+  /**
+   * 즉사 타일 지뢰밭. 무작위로 뿌리면 고속에서는 읽을 수가 없어서,
+   * 천천히 좌우로 흔들리는 안전 통로를 남기고 그 바깥에만 뿌린다.
+   */
   private minefield(row0: number, diff: number): Cell[][] {
     const r = this.rnd
     const rows: Cell[][] = []
-    const len = 8 + Math.floor(r() * 10)
-    const density = 0.14 + diff * 0.2
+    const len = this.paced(row0, 10 + Math.floor(r() * 8))
+    const density = 0.35 + diff * 0.35
+    const safeW = diff > 0.6 ? 2 : 3
+    let safe = Math.floor(r() * (8 - safeW))
+    const shiftEvery = this.paced(row0, 5)
     for (let i = 0; i < len; i++) {
-      const row: Cell[] = []
-      let safe = 0
-      for (let c = 0; c < 7; c++) {
-        if (r() < density) row.push(this.cell(12))
-        else { row.push(this.cell(this.lane(row0 + i, c))); safe++ }
+      if (i > 0 && i % shiftEvery === 0) {
+        safe = Math.max(0, Math.min(7 - safeW, safe + (r() < 0.5 ? -1 : 1)))
       }
-      if (safe === 0) row[3] = this.cell(this.lane(row0 + i, 3))
+      const row: Cell[] = []
+      for (let c = 0; c < 7; c++) {
+        const inSafe = c >= safe && c < safe + safeW
+        row.push(this.cell(!inSafe && r() < density ? 12 : this.lane(row0 + i, c)))
+      }
       rows.push(row)
     }
+    for (const rr of this.plainAt(row0 + rows.length, this.paced(row0, 3), this.restW())) rows.push(rr)
     return rows
   }
 
@@ -627,7 +668,7 @@ export class EndlessRoad {
       }
       rows.push(row)
     }
-    for (const rr of this.plainAt(row0 + rows.length, 4, 7)) rows.push(rr)
+    for (const rr of this.plainAt(row0 + rows.length, this.paced(row0, 4), this.restW())) rows.push(rr)
     return rows
   }
 
@@ -643,7 +684,7 @@ export class EndlessRoad {
       for (let c = 0; c < 7; c++) cols.push(c <= leftEnd || c >= rightStart)
       rows.push(this.mkRow(row0 + i, cols))
     }
-    for (const rr of this.plainAt(row0 + rows.length, 4, 7)) rows.push(rr)
+    for (const rr of this.plainAt(row0 + rows.length, this.paced(row0, 4), this.restW())) rows.push(rr)
     return rows
   }
 
@@ -664,7 +705,7 @@ export class EndlessRoad {
       }
       side = 1 - side
     }
-    for (const rr of this.plainAt(row0 + rows.length, 4, 7)) rows.push(rr)
+    for (const rr of this.plainAt(row0 + rows.length, this.paced(row0, 4), this.restW())) rows.push(rr)
     return rows
   }
 
@@ -672,7 +713,7 @@ export class EndlessRoad {
   private chicane(row0: number, diff: number): Cell[][] {
     const r = this.rnd
     const rows: Cell[][] = []
-    const width = Math.max(3, 5 - Math.round(diff * 2))
+    const width = 5 - 2 * Math.round(diff)
     const half = (width - 1) / 2
     const span = 12 + Math.floor(r() * 14)
     const amp = 3 - half
@@ -683,7 +724,7 @@ export class EndlessRoad {
       for (let c = 0; c < 7; c++) cols.push(Math.abs(c - center) <= half)
       rows.push(this.mkRow(row0 + i, cols))
     }
-    for (const rr of this.plainAt(row0 + rows.length, 3, 7)) rows.push(rr)
+    for (const rr of this.plainAt(row0 + rows.length, this.paced(row0, 3), this.restW())) rows.push(rr)
     return rows
   }
 
@@ -704,7 +745,7 @@ export class EndlessRoad {
       if (blocked >= 6) row[3] = this.cell(this.lane(row0 + i, 3))
       rows.push(row)
     }
-    for (const rr of this.plainAt(row0 + rows.length, 3, 7)) rows.push(rr)
+    for (const rr of this.plainAt(row0 + rows.length, this.paced(row0, 3), this.restW())) rows.push(rr)
     return rows
   }
 
@@ -724,7 +765,7 @@ export class EndlessRoad {
       for (let i = 0; i < gap; i++) rows.push(this.mkRow(row0 + rows.length, [false, false, false, false, false, false, false]))
       for (const rr of this.plainAt(row0 + rows.length, 3, 5)) rows.push(rr)
     }
-    for (const rr of this.plainAt(row0 + rows.length, 3, 7)) rows.push(rr)
+    for (const rr of this.plainAt(row0 + rows.length, this.paced(row0, 3), this.restW())) rows.push(rr)
     return rows
   }
 
@@ -744,7 +785,7 @@ export class EndlessRoad {
       }
       rows.push(row)
     }
-    for (const rr of this.plainAt(row0 + rows.length, 3, 7)) rows.push(rr)
+    for (const rr of this.plainAt(row0 + rows.length, this.paced(row0, 3), this.restW())) rows.push(rr)
     return rows
   }
 
@@ -753,7 +794,7 @@ export class EndlessRoad {
     const r = this.rnd
     const rows: Cell[][] = []
     const span = 14 + Math.floor(r() * 12)
-    const width = diff > 0.7 ? 1 : 2
+    const width = diff > 0.85 ? 1 : 3
     const half = (width - 1) / 2
     const phase = r() * Math.PI * 2
     for (let i = 0; i < span; i++) {
@@ -762,7 +803,7 @@ export class EndlessRoad {
       for (let c = 0; c < 7; c++) cols.push(Math.abs(c - center) <= half)
       rows.push(this.mkRow(row0 + i, cols))
     }
-    for (const rr of this.plainAt(row0 + rows.length, 4, 7)) rows.push(rr)
+    for (const rr of this.plainAt(row0 + rows.length, this.paced(row0, 4), this.restW())) rows.push(rr)
     return rows
   }
 
@@ -774,7 +815,7 @@ export class EndlessRoad {
     // 초반에는 두 칸짜리 보급 패치를 줘서 놓치기 어렵게 한다
     const width = diff > 0.55 ? 1 : 2
     const col = 1 + Math.floor(r() * (6 - width))
-    for (const rr of this.plainAt(row0, 3, 7)) rows.push(rr)
+    for (const rr of this.plainAt(row0, 3, this.restW())) rows.push(rr)
     for (let i = 0; i < 3; i++) {
       const row: Cell[] = []
       for (let c = 0; c < 7; c++) {
@@ -783,7 +824,7 @@ export class EndlessRoad {
       }
       rows.push(row)
     }
-    for (const rr of this.plainAt(row0 + rows.length, 3, 7)) rows.push(rr)
+    for (const rr of this.plainAt(row0 + rows.length, this.paced(row0, 3), this.restW())) rows.push(rr)
     return rows
   }
 }
@@ -799,7 +840,7 @@ export function runtimePlanet(planetIndex: number): Planet {
   const cached = RUNTIME_PLANETS.get(planetIndex)
   if (cached) return cached
   const base = PLANETS[planetIndex % PLANETS.length]
-  const k = overdrive(planetIndex)
+  const k = overdrive(planetIndex) * SPEED_BOOST
   // 산소는 행성이 넘어갈수록 조금씩 빡빡해진다
   const tighten = Math.max(0.72, 1 - planetIndex * 0.035)
   const p: Planet = {
@@ -870,6 +911,13 @@ export class Ship {
   /** 이번 프레임에 적용할 최고속 (오버드라이브 반영) */
   private maxZ = MAX_ZVEL
   private zAccel = ZACCEL
+  private speedK = 1
+  /**
+   * 조향량은 전진속도에 비례한다(원작 공식). 속도 배율을 그대로 두면 폭 322인
+   * 도로를 1초 만에 가로질러 버려서 조종이 안 된다. 배율을 거의 상쇄해
+   * 좌우 이동 속도 자체는 원작과 비슷하게 유지한다.
+   */
+  private steerK = 1
 
   private sanitize() {
     const v = this.v
@@ -882,6 +930,8 @@ export class Ship {
     const v = this.v
     this.maxZ = planet.maxZVel ?? MAX_ZVEL
     this.zAccel = planet.zAccel ?? ZACCEL
+    this.speedK = this.maxZ / MAX_ZVEL
+    this.steerK = Math.pow(this.speedK, -0.85)
     this.sanitize()
     const canControl = v.state === ShipState.Alive
 
@@ -925,8 +975,8 @@ export class Ship {
   private applyTouch(eff: Effect, ev: ShipEvents) {
     const v = this.v
     switch (eff) {
-      case Effect.Accel: v.vz += PAD_ZACCEL; break
-      case Effect.Decel: v.vz -= PAD_ZACCEL; break
+      case Effect.Accel: v.vz += PAD_ZACCEL * this.speedK; break
+      case Effect.Decel: v.vz -= PAD_ZACCEL * this.speedK; break
       case Effect.Kill:
         if (v.state !== ShipState.Exploded) ev.exploded?.()
         v.state = ShipState.Exploded
@@ -968,7 +1018,7 @@ export class Ship {
     if (onSliding) return
     const c1 = (goingUp || aboveNothing) && v.xMovementBase === 0 && v.vy > 0 && v.y - v.jumpedFromY < 30
     const c2 = !goingUp && !aboveNothing
-    if (c1 || c2) v.xMovementBase = canControl ? turn * XMOVE : 0
+    if (c1 || c2) v.xMovementBase = canControl ? turn * XMOVE * this.steerK : 0
   }
 
   private updateJump(canControl: boolean, aboveNothing: boolean, jump: boolean, planet: Planet) {
@@ -1968,61 +2018,18 @@ export class SkyRoadsGame {
     const speedFrac = Math.min(1, v.vz / this.maxZ)
     const camBack = CAM_BACK * (1 + 0.12 * speedFrac)
     this.camZ = v.z * CELL - camBack
-    // 최고속 근처에서만 1픽셀 흔들림
-    const shakeAmt = Math.max(0, speedFrac - 0.7) / 0.3
-    this.shakeX = shakeAmt > 0 ? (((this.frame * 7) % 3) - 1) * shakeAmt : 0
-    this.shakeY = shakeAmt > 0 ? (((this.frame * 5) % 3) - 1) * shakeAmt * 0.6 : 0
     r.clipBottom = SCENE_BOTTOM    // 대시보드 뒤로는 그릴 필요 없음
 
     const startRow = Math.max(0, Math.floor(v.z) - 4)
     const endRow = startRow + VIEW_ROWS
-    const tiles = this.planet.tiles
-    const cubeBase = this.planet.cube
+    const shipRow = Math.floor(v.z)
 
-    for (let z = endRow; z >= startRow; z--) {
-      const row = this.road.rowAt(z)
-      if (!row) continue
-      const prev = this.road.rowAt(z - 1)
-      const zStart = z * CELL         // 카메라에 가까운 쪽 면
-      const zEnd = (z + 1) * CELL
-      const dzFar = zEnd - this.camZ
-      if (dzFar <= NEAR_Z) continue
-      // 이 행의 가장 높은 지점(풀블록 윗면)이 화면 아래라면 통째로 생략
-      if (HORIZON_Y + (CAM_Y - CUBE_FULL_Y) * (FOCAL / dzFar) >= SCENE_BOTTOM) continue
-      const far = zStart - this.camZ > FAR_FACE_Z
-      // 한 행 걸러 윗면을 조금 어둡게 → 도로가 밑으로 흘러가는 게 눈에 보인다
-      const rowK = (z & 1) === 0 ? 1 : 0.86
-      // 도로 셀 순서: 화면 중앙에서 먼 컬럼부터 그린다
-      const order = [0, 6, 1, 5, 2, 4, 3]
-      for (const x of order) {
-        const c = row[x]
-        if (isEmptyCell(c)) continue
-        const xl = x * CELL - CELL * 3.5
-        const xr = xl + CELL
-        const hSelf = c.cube !== 0 ? cubeHeight(c) : c.tile !== 0 ? GROUND_Y : 0
-        const hL = x > 0 ? heightOf(row[x - 1]) : 0
-        const hR = x < 6 ? heightOf(row[x + 1]) : 0
-        const hF = prev ? heightOf(prev[x]) : 0
-        const drawLeft = !far && (x === 0 || hL < hSelf)
-        const drawRight = !far && (x === 6 || hR < hSelf)
-        const drawFront = !far && hF < hSelf
-
-        if (c.tile !== 0) {
-          const base = tiles[c.tile] ?? tiles[1]
-          this.box(xl, xr, TILE_BOTTOM_Y, GROUND_Y, zStart, zEnd, base, drawFront, drawLeft, drawRight, rowK)
-        }
-        if (c.cube !== 0 && !c.tunnel) {
-          const base = c.cubeColor ? tiles[c.cubeColor] ?? cubeBase : cubeBase
-          this.box(xl, xr, GROUND_Y, cubeHeight(c), zStart, zEnd, base, drawFront, drawLeft, drawRight)
-        }
-        if (c.tunnel) {
-          this.tunnelArch(xl, xr, zStart, zEnd, tiles[c.tile] ?? tiles[1])
-        }
-      }
-    }
-
+    // 페인터 알고리즘: 먼 행 → 우주선 → 우주선보다 가까운 행.
+    // 이렇게 해야 옆으로 스칠 때 벽 블록이 우주선을 제대로 가린다.
+    for (let z = endRow; z >= Math.max(startRow, shipRow); z--) this.renderRow(z)
     this.drawSpeedStreaks(speedFrac)
     this.drawShip()
+    for (let z = shipRow - 1; z >= startRow; z--) this.renderRow(z)
 
     if (this.flash > 0) {
       const c = rgba(255, 255, 255)
@@ -2036,6 +2043,51 @@ export class SkyRoadsGame {
     this.drawOverlay()
 
     this.ctx.putImageData(this.image, 0, 0)
+  }
+
+  /** 도로 한 행을 그린다. 먼 컬럼부터 안쪽으로. */
+  private renderRow(z: number) {
+    const tiles = this.planet.tiles
+    const cubeBase = this.planet.cube
+    const row = this.road.rowAt(z)
+    if (!row) return
+    const prev = this.road.rowAt(z - 1)
+    const zStart = z * CELL         // 카메라에 가까운 쪽 면
+    const zEnd = (z + 1) * CELL
+    const dzFar = zEnd - this.camZ
+    if (dzFar <= NEAR_Z) return
+    // 이 행의 가장 높은 지점(풀블록 윗면)이 화면 아래라면 통째로 생략
+    if (HORIZON_Y + (CAM_Y - CUBE_FULL_Y) * (FOCAL / dzFar) >= SCENE_BOTTOM) return
+    const far = zStart - this.camZ > FAR_FACE_Z
+    // 한 행 걸러 윗면을 조금 어둡게 → 도로가 밑으로 흘러가는 게 눈에 보인다
+    const rowK = (z & 1) === 0 ? 1 : 0.86
+    // 도로 셀 순서: 화면 중앙에서 먼 컬럼부터 그린다
+    const order = [0, 6, 1, 5, 2, 4, 3]
+    for (const x of order) {
+      const c = row[x]
+      if (isEmptyCell(c)) continue
+      const xl = x * CELL - CELL * 3.5
+      const xr = xl + CELL
+      const hSelf = c.cube !== 0 ? cubeHeight(c) : c.tile !== 0 ? GROUND_Y : 0
+      const hL = x > 0 ? heightOf(row[x - 1]) : 0
+      const hR = x < 6 ? heightOf(row[x + 1]) : 0
+      const hF = prev ? heightOf(prev[x]) : 0
+      const drawLeft = !far && (x === 0 || hL < hSelf)
+      const drawRight = !far && (x === 6 || hR < hSelf)
+      const drawFront = !far && hF < hSelf
+
+      if (c.tile !== 0) {
+        const base = tiles[c.tile] ?? tiles[1]
+        this.box(xl, xr, TILE_BOTTOM_Y, GROUND_Y, zStart, zEnd, base, drawFront, drawLeft, drawRight, rowK)
+      }
+      if (c.cube !== 0 && !c.tunnel) {
+        const base = c.cubeColor ? tiles[c.cubeColor] ?? cubeBase : cubeBase
+        this.box(xl, xr, GROUND_Y, cubeHeight(c), zStart, zEnd, base, drawFront, drawLeft, drawRight)
+      }
+      if (c.tunnel) {
+        this.tunnelArch(xl, xr, zStart, zEnd, tiles[c.tile] ?? tiles[1])
+      }
+    }
   }
 
   private box(
@@ -2110,10 +2162,16 @@ export class SkyRoadsGame {
     }
 
     const ctl = this.controls()
-    const HULL: RGB = [46, 74, 114]
-    const HULL_D: RGB = [26, 40, 62]
-    const HULL_L: RGB = [110, 150, 200]
-    const DOME: RGB = [176, 208, 236]
+    // 원작 CARS.LZS 스프라이트를 본뜬 형태 —
+    // 뒤로 젖혀진 얇고 넓은 날개(끝이 살짝 들림), 가운데 좁고 높은 동체,
+    // 그 위의 둥근 밝은 캐노피, 날개에 박힌 붉은 엔진 두 개. 폭은 충돌폭과 같은 ±14.
+    const WING: RGB = [58, 86, 124]
+    const WING_D: RGB = [26, 40, 62]
+    const WING_L: RGB = [116, 152, 196]
+    const BODY: RGB = [44, 68, 104]
+    const DOME: RGB = [150, 190, 224]
+    const DOME_L: RGB = [206, 230, 248]
+    const ENGINE: RGB = [206, 40, 40]
     const flick = (this.frame % 4) / 4
 
     type Face = { p: Array<[number, number, number]>; c: number; z: number }
@@ -2124,32 +2182,47 @@ export class SkyRoadsGame {
       faces.push({ p: pts.map((p) => [p[0] + sx, p[1] + sy, p[2] + sz] as [number, number, number]), c, z: zz / pts.length })
     }
 
-    // 본체 (뒤 -15 ~ 앞 +15, 바닥 0 ~ 윗면 9)
-    add([[-18, 9, -15], [18, 9, -15], [11, 9, 15], [-11, 9, 15]], shade(HULL_L, 1))
-    add([[-18, 0, -15], [18, 0, -15], [11, 0, 15], [-11, 0, 15]], shade(HULL_D, 0.5))
-    add([[-18, 9, -15], [18, 9, -15], [18, 0, -15], [-18, 0, -15]], shade(HULL, 0.75))
-    add([[-18, 9, -15], [-18, 0, -15], [-11, 0, 15], [-11, 9, 15]], shade(HULL, 0.55))
-    add([[18, 9, -15], [18, 0, -15], [11, 0, 15], [11, 9, 15]], shade(HULL, 0.92))
-    // 좌우 포드
-    for (const s of [-1, 1]) {
-      const x0 = s * 12, x1 = s * 20
-      const xa = Math.min(x0, x1), xb = Math.max(x0, x1)
-      add([[xa, 11, -16], [xb, 11, -16], [xb, 11, 2], [xa, 11, 2]], shade(HULL_L, 0.88))
-      add([[xa, 11, -16], [xb, 11, -16], [xb, 3, -16], [xa, 3, -16]], shade(HULL_D, 1.1))
-      add([[xa + 1, 9, -16.4], [xb - 1, 9, -16.4], [xb - 1, 5, -16.4], [xa + 1, 5, -16.4]], rgba(198 - flick * 40, 52, 44))
-      // 엔진 불꽃 — 뒤로 갈수록 좁아지는 판 두 장
-      const thrust = (ctl.accel > 0 ? 1 : ctl.accel < 0 ? 0.2 : 0.5) * (0.5 + 0.9 * Math.min(1, this.ship.v.vz / this.maxZ))
-      const fl = (3 + flick * 4) * thrust + 2
-      add([[xa + 2, 8.5, -17 - fl * 0.5], [xb - 2, 8.5, -17 - fl * 0.5], [xb - 2, 5.5, -17 - fl * 0.5], [xa + 2, 5.5, -17 - fl * 0.5]], rgba(252, 200 - flick * 50, 96))
-      add([[xa + 3, 8, -17 - fl], [xb - 3, 8, -17 - fl], [xb - 3, 6, -17 - fl], [xa + 3, 6, -17 - fl]], rgba(252, 128 + flick * 50, 48))
+    const thrust = (ctl.accel > 0 ? 1 : ctl.accel < 0 ? 0.15 : 0.45) *
+      (0.45 + 0.95 * Math.min(1, this.ship.v.vz / this.maxZ))
+
+    for (const g of [-1, 1]) {
+      const inner = g * 4, tip = g * 14, mid = g * 11
+      // 날개 윗면 — 뿌리에서 끝으로 갈수록 뒤로 젖혀지고 살짝 들린다
+      add([[inner, 5, 11], [inner, 5, -12], [tip, 6.5, -9], [mid, 6.5, 0]], shade(WING_L, 0.92))
+      // 날개 뒷전
+      add([[inner, 5, -12], [tip, 6.5, -9], [tip, 5, -9], [inner, 3.5, -12]], shade(WING, 0.6))
+      // 날개 아랫면
+      add([[inner, 3.5, 11], [inner, 3.5, -12], [tip, 5, -9], [mid, 5, 0]], shade(WING_D, 0.7))
+      // 끝 윙렛
+      add([[tip, 6.5, -9], [mid, 6.5, 0], [mid, 9, 0], [tip, 9, -8]], shade(WING, g < 0 ? 0.55 : 1.05))
+      // 엔진 — 날개 위에 박힌 붉은 타원 (두 단으로 둥글게)
+      const e0 = g * 6, e1 = g * 11
+      const ea = Math.min(e0, e1), eb = Math.max(e0, e1)
+      add([[ea, 6.6, -8], [eb, 6.6, -8], [eb, 6.6, -3], [ea, 6.6, -3]], shade(ENGINE, 0.85))
+      add([[ea + 1, 6.8, -7], [eb - 1, 6.8, -7], [eb - 1, 6.8, -4], [ea + 1, 6.8, -4]],
+          rgba(255, 128 + flick * 60, 96))
+      // 후미 화염
+      const fl = (4 + flick * 5) * thrust + 2
+      add([[ea + 1, 6.4, -9 - fl * 0.5], [eb - 1, 6.4, -9 - fl * 0.5],
+           [eb - 1, 5.2, -9 - fl * 0.5], [ea + 1, 5.2, -9 - fl * 0.5]], rgba(252, 176 - flick * 40, 72))
+      add([[ea + 2, 6.2, -9 - fl], [eb - 2, 6.2, -9 - fl],
+           [eb - 2, 5.6, -9 - fl], [ea + 2, 5.6, -9 - fl]], rgba(255, 240, 190))
     }
-    // 캐노피 돔
-    add([[-6, 15, -5], [6, 15, -5], [5, 15, 6], [-5, 15, 6]], shade(DOME, 1))
-    add([[-6, 15, -5], [6, 15, -5], [6, 9, -5], [-6, 9, -5]], shade(DOME, 0.62))
-    add([[-6, 15, -5], [-6, 9, -5], [-5, 9, 6], [-5, 15, 6]], shade(DOME, 0.5))
-    add([[6, 15, -5], [6, 9, -5], [5, 9, 6], [5, 15, 6]], shade(DOME, 0.85))
-    // 노즈
-    add([[-11, 9, 15], [11, 9, 15], [7, 3, 21], [-7, 3, 21]], shade(HULL_L, 0.8))
+
+    // 동체 — 좁고 높다
+    add([[-5, 10, -12], [5, 10, -12], [3, 10, 13], [-3, 10, 13]], shade(BODY, 1.25))   // 윗면
+    add([[-5, 10, -12], [5, 10, -12], [5, 3, -12], [-5, 3, -12]], shade(BODY, 0.65))   // 뒷면
+    add([[-5, 10, -12], [-5, 3, -12], [-3, 3, 13], [-3, 10, 13]], shade(BODY, 0.5))    // 좌
+    add([[5, 10, -12], [5, 3, -12], [3, 3, 13], [3, 10, 13]], shade(BODY, 1.0))        // 우
+    add([[-3, 10, 13], [3, 10, 13], [2, 6, 18], [-2, 6, 18]], shade(WING_L, 0.8))      // 노즈
+    add([[-5, 3, -12], [5, 3, -12], [3, 3, 13], [-3, 3, 13]], shade(WING_D, 0.55))     // 바닥
+
+    // 캐노피 — 원작처럼 납작하고 둥근 돔. 두 단 + 반사 하이라이트.
+    add([[-4, 10.6, -7], [4, 10.6, -7], [4, 10.6, 5], [-4, 10.6, 5]], shade(DOME, 0.9))
+    add([[-4, 10.6, -7], [4, 10.6, -7], [4, 8, -7], [-4, 8, -7]], shade(DOME, 0.6))
+    add([[-3, 12, -5], [3, 12, -5], [3, 12, 4], [-3, 12, 4]], shade(DOME, 1.05))
+    add([[-3, 12, -5], [3, 12, -5], [3, 10.6, -5], [-3, 10.6, -5]], shade(DOME, 0.75))
+    add([[-2, 12.8, -3], [2, 12.8, -3], [2, 12.8, 2], [-2, 12.8, 2]], rgba(...DOME_L))
 
     faces.sort((a, b) => b.z - a.z)
     for (const f of faces) this.quad(f.p, f.c)
@@ -2251,8 +2324,9 @@ export class SkyRoadsGame {
 
     drawText(r, 4, 3, this.planet.name, rgba(255, 224, 96), black)
     drawText(r, 4, 12, `DIST ${Math.floor(this.ship.v.z)}`, dim, black)
-    const spd = Math.round((this.ship.v.vz / MAX_ZVEL) * 100)
-    const spdMax = Math.round((this.maxZ / MAX_ZVEL) * 100)
+    const unit = MAX_ZVEL * SPEED_BOOST
+    const spd = Math.round((this.ship.v.vz / unit) * 100)
+    const spdMax = Math.round((this.maxZ / unit) * 100)
     drawText(r, 4, 21, `SPD ${spd}/${spdMax}`, spd >= spdMax ? rgba(120, 240, 255) : dim, black)
     const sc = `SCORE ${Math.floor(this.score)}`
     drawText(r, SCREEN_W - 4 - textWidth(sc), 3, sc, white, black)
