@@ -18,7 +18,8 @@
 /* 1. 원작 물리 상수                                                    */
 /* ------------------------------------------------------------------ */
 
-export const TICK = 1 / 30            // 고정 시뮬레이션 스텝 (원작 프레임)
+export const TICK = 1 / 36            // 고정 시뮬레이션 스텝.
+                                      // 원작 산소 소모식이 0x24(=36) 로 나누므로 원작은 36Hz 다.
 
 const GROUND_Y = 80                   // 0x2800/0x80 — 도로 윗면
 const TILE_BOTTOM_Y = 72              // 0x2400/0x80 — 도로 슬래브 아랫면
@@ -30,8 +31,19 @@ const ROAD_W = 322                    // 7 * 46
 const START_X = 256                   // 0x8000/0x80 — 도로 중앙
 
 const JUMP_VY = 0x480 / 0x80          // 9.0
-const MAX_ZVEL = 0x2AAA / 0x10000     // 0.16666
+const MAX_ZVEL = 0x2AAA / 0x10000     // 0.16666 — 원작 최고속
 const ZACCEL = 0x4B / 0x10000         // 스로틀 가감속
+
+/**
+ * 원작은 30스테이지로 끝나므로 최고속이 고정이지만, 무한 모드에서는 그러면
+ * 5분을 달려도 체감 속도가 그대로다. 행성을 넘길 때마다 최고속과 가속을
+ * 같은 비율로 끌어올려(=가속에 걸리는 시간은 유지) 갈수록 빨라지게 한다.
+ */
+const OVERDRIVE_PER_PLANET = 0.11
+const OVERDRIVE_MAX = 0.9
+export function overdrive(planetIndex: number): number {
+  return 1 + Math.min(OVERDRIVE_MAX, Math.max(0, planetIndex) * OVERDRIVE_PER_PLANET)
+}
 const PAD_ZACCEL = 0x12F / 0x10000    // 부스트/감속 패드
 const XMOVE = 0x1D / 0x80             // 조향 계수
 const XRATE_BIAS = 0x618 / 0x10000    // 정지 상태에서도 남는 미세 조향
@@ -110,6 +122,9 @@ const SPECIAL_COLORS: Record<number, RGB> = {
   12: [232, 60, 112],   // burning — 즉사
 }
 
+/** 도로 무늬. 행성마다 달라서 흘러가는 그림이 매번 바뀐다. */
+export type RoadStyle = 'stripe' | 'checker' | 'band' | 'rail'
+
 export interface Planet {
   name: string
   gravity: number            // 원작 raw 값 (표시값 = (raw-3)*100)
@@ -118,6 +133,11 @@ export interface Planet {
   tiles: RGB[]               // 인덱스 1..15 의 윗면 색
   cube: RGB                  // 블록 기본 윗면 색
   lanes: number[]            // 컬럼별 기본 색 인덱스 (도로 줄무늬)
+  lanesAlt: number[]         // 무늬가 교차할 때 쓰는 두 번째 색 세트
+  style: RoadStyle
+  /** 런타임에 덮어쓰는 최고속/가속 (없으면 원작 값) */
+  maxZVel?: number
+  zAccel?: number
   sky: { top: RGB; bottom: RGB; nebula: RGB; star: RGB }
   body: { x: number; y: number; r: number; color: RGB; ring: boolean } | null
   terrain: RGB | null        // 지평선 실루엣 색 (없으면 안 그림)
@@ -136,6 +156,7 @@ export const PLANETS: Planet[] = [
     name: 'RED HEAT', gravity: 8, fuel: 340, oxygen: 52,
     tiles: mkTiles([[196, 32, 32], [140, 24, 24], [232, 96, 40], [96, 16, 16], [216, 64, 32], [160, 40, 24], [120, 20, 28], [200, 48, 48], [148, 28, 20], [236, 120, 48]]),
     cube: [188, 152, 132], lanes: [3, 1, 5, 3, 5, 1, 3],
+    lanesAlt: [4, 3, 1, 1, 1, 3, 4], style: 'stripe',
     sky: { top: [8, 0, 8], bottom: [56, 8, 12], nebula: [128, 24, 24], star: [255, 200, 180] },
     body: { x: 246, y: 44, r: 30, color: [200, 72, 40], ring: false }, terrain: [72, 20, 20],
   },
@@ -143,6 +164,7 @@ export const PLANETS: Planet[] = [
     name: 'INTO THE SUN', gravity: 7, fuel: 330, oxygen: 50,
     tiles: mkTiles([[240, 176, 32], [200, 120, 24], [248, 216, 96], [168, 88, 16], [232, 152, 48], [144, 72, 16], [252, 232, 152], [216, 136, 32], [184, 104, 24], [248, 196, 72]]),
     cube: [200, 176, 140], lanes: [5, 3, 1, 7, 1, 3, 5],
+    lanesAlt: [1, 5, 3, 3, 3, 5, 1], style: 'band',
     sky: { top: [40, 12, 0], bottom: [168, 88, 16], nebula: [240, 160, 40], star: [255, 240, 200] },
     body: { x: 160, y: 26, r: 46, color: [255, 232, 128], ring: false }, terrain: [96, 44, 8],
   },
@@ -150,6 +172,7 @@ export const PLANETS: Planet[] = [
     name: 'BLUE PLANET', gravity: 9, fuel: 320, oxygen: 48,
     tiles: mkTiles([[40, 96, 224], [24, 60, 160], [72, 176, 240], [16, 40, 112], [56, 128, 216], [32, 72, 176], [120, 208, 248], [40, 88, 200], [20, 52, 136], [88, 160, 232]]),
     cube: [176, 190, 208], lanes: [3, 5, 1, 7, 1, 5, 3],
+    lanesAlt: [5, 1, 3, 3, 3, 1, 5], style: 'checker',
     sky: { top: [0, 4, 24], bottom: [8, 24, 72], nebula: [32, 72, 168], star: [200, 224, 255] },
     body: { x: 66, y: 40, r: 34, color: [48, 112, 216], ring: false }, terrain: [16, 32, 72],
   },
@@ -157,6 +180,7 @@ export const PLANETS: Planet[] = [
     name: 'SATELLITE', gravity: 6, fuel: 330, oxygen: 50,
     tiles: mkTiles([[176, 176, 184], [120, 120, 132], [216, 216, 224], [88, 88, 100], [152, 152, 164], [104, 104, 116], [240, 240, 248], [136, 136, 148], [72, 72, 84], [196, 196, 208]]),
     cube: [208, 208, 216], lanes: [5, 3, 1, 5, 1, 3, 5],
+    lanesAlt: [9, 5, 3, 7, 3, 5, 9], style: 'rail',
     sky: { top: [0, 0, 0], bottom: [8, 8, 16], nebula: [40, 40, 56], star: [255, 255, 255] },
     body: { x: 250, y: 36, r: 26, color: [64, 128, 216], ring: false }, terrain: [56, 56, 64],
   },
@@ -164,6 +188,7 @@ export const PLANETS: Planet[] = [
     name: 'MISTY', gravity: 7, fuel: 320, oxygen: 46,
     tiles: mkTiles([[131, 16, 231], [96, 12, 172], [213, 65, 65], [168, 40, 224], [72, 8, 132], [180, 96, 240], [232, 96, 96], [112, 16, 196], [148, 32, 208], [88, 16, 152]]),
     cube: [176, 176, 188], lanes: [1, 2, 1, 3, 1, 2, 1],
+    lanesAlt: [5, 1, 5, 7, 5, 1, 5], style: 'stripe',
     sky: { top: [8, 4, 20], bottom: [40, 24, 72], nebula: [104, 64, 168], star: [230, 220, 255] },
     body: null, terrain: [104, 104, 128],
   },
@@ -171,6 +196,7 @@ export const PLANETS: Planet[] = [
     name: 'ASTEROID BELT', gravity: 10, fuel: 300, oxygen: 44,
     tiles: mkTiles([[168, 120, 64], [120, 84, 44], [200, 160, 96], [88, 60, 32], [148, 104, 56], [104, 72, 40], [216, 184, 128], [136, 96, 52], [72, 48, 28], [184, 140, 80]]),
     cube: [172, 148, 116], lanes: [3, 1, 5, 1, 5, 1, 3],
+    lanesAlt: [1, 5, 3, 3, 3, 5, 1], style: 'checker',
     sky: { top: [4, 4, 8], bottom: [20, 16, 20], nebula: [72, 56, 44], star: [240, 230, 210] },
     body: { x: 60, y: 30, r: 18, color: [140, 108, 72], ring: false }, terrain: [64, 48, 32],
   },
@@ -178,6 +204,7 @@ export const PLANETS: Planet[] = [
     name: 'CRAB NEBULA', gravity: 5, fuel: 320, oxygen: 46,
     tiles: mkTiles([[232, 48, 168], [168, 24, 120], [248, 128, 216], [120, 16, 88], [200, 40, 144], [144, 20, 104], [252, 176, 232], [216, 44, 156], [96, 12, 72], [240, 96, 200]]),
     cube: [200, 176, 200], lanes: [3, 1, 5, 7, 5, 1, 3],
+    lanesAlt: [6, 3, 1, 1, 1, 3, 6], style: 'band',
     sky: { top: [16, 0, 24], bottom: [64, 8, 56], nebula: [192, 40, 152], star: [255, 220, 250] },
     body: { x: 236, y: 30, r: 22, color: [248, 160, 224], ring: true }, terrain: null,
   },
@@ -185,6 +212,7 @@ export const PLANETS: Planet[] = [
     name: 'OVER THE BASE', gravity: 11, fuel: 300, oxygen: 44,
     tiles: mkTiles([[32, 176, 160], [20, 120, 112], [64, 216, 200], [16, 88, 80], [40, 152, 140], [24, 104, 96], [120, 240, 224], [36, 168, 152], [12, 72, 68], [80, 200, 184]]),
     cube: [160, 184, 180], lanes: [5, 3, 1, 3, 1, 3, 5],
+    lanesAlt: [3, 5, 9, 5, 9, 5, 3], style: 'rail',
     sky: { top: [0, 8, 12], bottom: [4, 32, 40], nebula: [16, 96, 104], star: [200, 255, 248] },
     body: null, terrain: [24, 60, 64],
   },
@@ -192,6 +220,7 @@ export const PLANETS: Planet[] = [
     name: 'THE EARTH', gravity: 12, fuel: 290, oxygen: 42,
     tiles: mkTiles([[48, 176, 64], [28, 120, 44], [96, 216, 104], [20, 88, 32], [64, 152, 72], [36, 104, 48], [160, 240, 168], [52, 184, 68], [16, 72, 28], [112, 200, 120]]),
     cube: [200, 208, 200], lanes: [3, 5, 1, 5, 1, 5, 3],
+    lanesAlt: [5, 3, 6, 1, 6, 3, 5], style: 'checker',
     sky: { top: [0, 0, 16], bottom: [8, 20, 56], nebula: [24, 64, 128], star: [255, 255, 255] },
     body: { x: 74, y: 34, r: 40, color: [56, 128, 208], ring: false }, terrain: [24, 56, 32],
   },
@@ -199,6 +228,7 @@ export const PLANETS: Planet[] = [
     name: 'DRUIDA', gravity: 13, fuel: 280, oxygen: 40,
     tiles: mkTiles([[224, 176, 48], [160, 120, 28], [248, 216, 120], [112, 80, 20], [192, 148, 40], [136, 100, 24], [252, 236, 176], [208, 164, 44], [88, 64, 16], [232, 196, 88]]),
     cube: [204, 184, 140], lanes: [1, 3, 5, 1, 5, 3, 1],
+    lanesAlt: [3, 1, 6, 5, 6, 1, 3], style: 'band',
     sky: { top: [16, 0, 20], bottom: [48, 16, 56], nebula: [128, 56, 152], star: [255, 240, 200] },
     body: { x: 250, y: 40, r: 34, color: [216, 176, 88], ring: true }, terrain: [72, 48, 24],
   },
@@ -246,6 +276,11 @@ export class EndlessRoad {
 
   planetAt(row: number): Planet {
     return PLANETS[Math.floor(Math.max(0, row) / PLANET_ROWS) % PLANETS.length]
+  }
+
+  /** 오버드라이브까지 반영한 이 지점의 최고속 */
+  maxZVelAt(row: number): number {
+    return MAX_ZVEL * overdrive(this.planetIndexAt(row))
   }
   planetIndexAt(row: number): number {
     return Math.floor(Math.max(0, row) / PLANET_ROWS)
@@ -313,12 +348,26 @@ export class EndlessRoad {
     return { tile: color, cube, cubeColor, tunnel }
   }
 
+  /**
+   * 컬럼/행에 따른 타일 색. 행성마다 무늬가 달라서 같은 도로도 다르게 흘러간다.
+   * 가로 방향으로 색이 바뀌는 스타일은 전진 속도를 눈으로 읽게 해주는 역할도 한다.
+   */
   private lane(row: number, col: number): number {
     const p = this.planetAt(row)
-    // 8칸마다 밴딩을 줘서 원작처럼 세로 줄무늬 위에 가로 리듬이 생기게
-    const banded = Math.floor(row / 8) % 4 === 3
-    const c = p.lanes[col]
-    return banded ? (c === 1 ? 3 : 1) : c
+    const A = p.lanes, B = p.lanesAlt
+    switch (p.style) {
+      case 'checker':
+        return ((row + col) & 1) === 0 ? A[col] : B[col]
+      case 'band':
+        return (Math.floor(row / 3) & 1) === 0 ? A[col] : B[col]
+      case 'rail':
+        // 바깥 두 줄은 고정 레일, 안쪽은 4행마다 교차
+        if (col === 0 || col === 6) return B[col]
+        return (Math.floor(row / 4) & 1) === 0 ? A[col] : B[col]
+      default:
+        // 세로 줄무늬 + 8행마다 가로 밴딩 (원작 MISTY 로드의 느낌)
+        return Math.floor(row / 8) % 4 === 3 ? B[col] : A[col]
+    }
   }
 
   /** 지정 컬럼에만 타일이 있는 행 */
@@ -339,11 +388,21 @@ export class EndlessRoad {
     return rows
   }
 
-  /** 이 행성 중력에서 넘을 수 있는 최대 공백 칸 수 */
-  private maxGap(row: number): number {
+  /**
+   * 공백이 행성 경계를 걸치면 뒤쪽 행성의 중력이 더 셀 수 있으므로,
+   * 공백이 덮는 모든 행 중 가장 빡빡한 값으로 자른다.
+   */
+  private safeGap(row: number, want: number): number {
+    let limit = this.maxGap(row)
+    for (let i = 1; i <= want; i++) limit = Math.min(limit, this.maxGap(row + i))
+    return Math.max(1, Math.min(want, limit))
+  }
+
+  /** 이 지점의 중력·최고속으로 넘을 수 있는 최대 공백 칸 수 */
+  maxGap(row: number): number {
     const g = Math.abs(gravityAccel(this.planetAt(row).gravity))
     const airFrames = (2 * JUMP_VY) / g
-    return Math.max(1, Math.min(4, Math.floor(airFrames * MAX_ZVEL) - 1))
+    return Math.max(1, Math.min(5, Math.floor(airFrames * this.maxZVelAt(row)) - 1))
   }
 
   private canJump(row: number): boolean {
@@ -354,8 +413,8 @@ export class EndlessRoad {
     const r = this.rnd
     const row0 = this.generated
     const planetProgress = (row0 % PLANET_ROWS) / PLANET_ROWS
-    // 첫 80칸은 난이도 0. 이후 2600칸에 걸쳐 서서히 올라간다.
-    const diff = Math.min(1, Math.max(0, (row0 - 80) / 2600))
+    // 첫 80칸은 난이도 0. 이후 1200칸에 걸쳐 올라간다(≈3분).
+    const diff = Math.min(1, Math.max(0, (row0 - 80) / 1200))
     const rows: Cell[][] = []
     const push = (rs: Cell[][]) => { for (const x of rs) rows.push(x) }
 
@@ -363,22 +422,27 @@ export class EndlessRoad {
     if (planetProgress < 0.06) return this.plain(9, 7)
     if (row0 - this.lastRefillRow > 34) { push(this.supply(row0)); return rows }
 
-    // [가중치, 등장 시작 칸, 생성기] — 패턴을 거리순으로 하나씩 풀어준다
+    // [가중치, 등장 시작 칸, 생성기] — 거리에 따라 패턴을 하나씩 풀어준다
     const pool: Array<[number, number, () => Cell[][]]> = [
-      [1.0, 0, () => this.plain(6 + Math.floor(r() * 6), 5 + Math.floor(r() * 3))],
+      [0.9, 0, () => this.plain(5 + Math.floor(r() * 5), 5 + Math.floor(r() * 3))],
       [0.5, 0, () => this.supply(row0)],
-      [0.9, 40, () => this.narrow(row0, diff)],
-      [1.0, 60, () => this.gaps(row0, diff)],
-      [0.5, 90, () => this.padRun(row0, Effect.Accel)],
-      [0.4, 90, () => this.padRun(row0, Effect.Decel)],
-      [0.9, 140, () => this.slalom(row0, diff)],
-      [0.5, 180, () => this.tunnel(row0)],
-      [0.6, 220, () => this.padRun(row0, Effect.Slide)],
-      [0.8, 260, () => this.islands(row0, diff)],
-      [0.7, 320, () => this.hurdles(row0, diff)],
-      [0.45, 380, () => this.split(row0, diff)],
-      [0.4 + diff * 0.4, 460, () => this.staircase(row0, diff)],
-      [0.35 + diff * 0.5, 560, () => this.minefield(row0, diff)],
+      [0.9, 30, () => this.narrow(row0, diff)],
+      [1.0, 50, () => this.gaps(row0, diff)],
+      [0.7, 70, () => this.chicane(row0, diff)],
+      [0.5, 80, () => this.padRun(row0, Effect.Accel)],
+      [0.4, 80, () => this.padRun(row0, Effect.Decel)],
+      [0.9, 110, () => this.slalom(row0, diff)],
+      [0.6, 130, () => this.pillars(row0, diff)],
+      [0.5, 150, () => this.tunnel(row0)],
+      [0.6, 170, () => this.padRun(row0, Effect.Slide)],
+      [0.8, 190, () => this.islands(row0, diff)],
+      [0.7, 220, () => this.hurdles(row0, diff)],
+      [0.5, 250, () => this.boostChain(row0, diff)],
+      [0.45, 280, () => this.split(row0, diff)],
+      [0.5, 310, () => this.killLane(row0, diff)],
+      [0.4 + diff * 0.4, 350, () => this.staircase(row0, diff)],
+      [0.35 + diff * 0.6, 420, () => this.minefield(row0, diff)],
+      [0.4 + diff * 0.5, 520, () => this.weave(row0, diff)],
     ]
     let total = 0
     for (const [w, minRow] of pool) if (row0 >= minRow) total += w
@@ -389,8 +453,9 @@ export class EndlessRoad {
       if (pick <= 0) { push(fn()); break }
     }
     if (rows.length === 0) push(this.plain(8, 7))
-    // 패턴 사이에 짧은 착지 구간을 넣어 원작의 "숨 돌리는" 리듬을 만든다
-    push(this.plain(2 + Math.floor(r() * 3), 7))
+    // 패턴 사이에 짧은 착지 구간을 넣어 원작의 "숨 돌리는" 리듬을 만든다.
+    // 난이도가 오를수록 이 여유가 사라진다.
+    push(this.plain(Math.max(1, 3 - Math.round(diff * 2)) + Math.floor(r() * 3), 7))
     return rows
   }
 
@@ -425,7 +490,8 @@ export class EndlessRoad {
       const padLen = 4 - Math.floor(diff * 2) + Math.floor(r() * 3)
       const w = 7 - Math.floor(r() * (2 + diff * 3))
       for (const rr of this.plainAt(row0 + rows.length, padLen, w)) rows.push(rr)
-      const gap = row0 < 200 ? 1 : 1 + Math.floor(r() * gmax)
+      const gapRow = row0 + rows.length
+      const gap = row0 < 200 ? 1 : this.safeGap(gapRow, 1 + Math.floor(r() * gmax))
       for (let i = 0; i < gap; i++) rows.push(this.mkRow(row0 + rows.length, [false, false, false, false, false, false, false]))
     }
     for (const rr of this.plainAt(row0 + rows.length, 5, 7)) rows.push(rr)
@@ -458,7 +524,7 @@ export class EndlessRoad {
         for (let c = 0; c < 7; c++) cols.push(Math.abs(c - center) <= half)
         rows.push(this.mkRow(row0 + rows.length, cols))
       }
-      const gap = 1 + Math.floor(r() * gmax)
+      const gap = this.safeGap(row0 + rows.length, 1 + Math.floor(r() * gmax))
       for (let i = 0; i < gap; i++) rows.push(this.mkRow(row0 + rows.length, [false, false, false, false, false, false, false]))
       center += (r() < 0.5 ? -1 : 1) * (1 + Math.floor(r() * 2))
       center = Math.max(1, Math.min(5, center))
@@ -602,11 +668,109 @@ export class EndlessRoad {
     return rows
   }
 
+  /** 도로가 통째로 좌우로 스윽 밀려가는 구간 */
+  private chicane(row0: number, diff: number): Cell[][] {
+    const r = this.rnd
+    const rows: Cell[][] = []
+    const width = Math.max(3, 5 - Math.round(diff * 2))
+    const half = (width - 1) / 2
+    const span = 12 + Math.floor(r() * 14)
+    const amp = 3 - half
+    const phase = r() * Math.PI * 2
+    for (let i = 0; i < span; i++) {
+      const center = 3 + Math.round(Math.sin(phase + (i / span) * Math.PI * 2) * amp)
+      const cols: boolean[] = []
+      for (let c = 0; c < 7; c++) cols.push(Math.abs(c - center) <= half)
+      rows.push(this.mkRow(row0 + i, cols))
+    }
+    for (const rr of this.plainAt(row0 + rows.length, 3, 7)) rows.push(rr)
+    return rows
+  }
+
+  /** 넓은 도로 위에 기둥 블록이 흩뿌려진 구간 — 피해서 지나가거나 넘는다 */
+  private pillars(row0: number, diff: number): Cell[][] {
+    const r = this.rnd
+    const rows: Cell[][] = []
+    const len = 10 + Math.floor(r() * 12)
+    const density = 0.12 + diff * 0.16
+    for (let i = 0; i < len; i++) {
+      const row: Cell[] = []
+      let blocked = 0
+      for (let c = 0; c < 7; c++) {
+        const put = r() < density
+        if (put) blocked++
+        row.push(this.cell(this.lane(row0 + i, c), put ? (r() < 0.5 ? 1 : 2) : 0, 0))
+      }
+      if (blocked >= 6) row[3] = this.cell(this.lane(row0 + i, 3))
+      rows.push(row)
+    }
+    for (const rr of this.plainAt(row0 + rows.length, 3, 7)) rows.push(rr)
+    return rows
+  }
+
+  /** 부스트 패드 뒤에 긴 틈 — 속도를 받아서 날아가야 한다 */
+  private boostChain(row0: number, diff: number): Cell[][] {
+    const r = this.rnd
+    const rows: Cell[][] = []
+    const gmax = this.maxGap(row0)
+    const n = 2 + Math.floor(r() * 2)
+    for (let k = 0; k < n; k++) {
+      for (let i = 0; i < 4; i++) {
+        const row: Cell[] = []
+        for (let c = 0; c < 7; c++) row.push(this.cell(Math.abs(c - 3) <= 1 ? 10 : this.lane(row0 + rows.length, c)))
+        rows.push(row)
+      }
+      const gap = this.safeGap(row0 + rows.length, Math.min(gmax, 2 + Math.floor(r() * 2 + diff * 2)))
+      for (let i = 0; i < gap; i++) rows.push(this.mkRow(row0 + rows.length, [false, false, false, false, false, false, false]))
+      for (const rr of this.plainAt(row0 + rows.length, 3, 5)) rows.push(rr)
+    }
+    for (const rr of this.plainAt(row0 + rows.length, 3, 7)) rows.push(rr)
+    return rows
+  }
+
+  /** 한두 차선이 통째로 즉사 타일 — 차선을 읽고 피해야 한다 */
+  private killLane(row0: number, diff: number): Cell[][] {
+    const r = this.rnd
+    const rows: Cell[][] = []
+    const len = 10 + Math.floor(r() * 12)
+    const lanesHot = diff > 0.5 ? 2 : 1
+    let hot = Math.floor(r() * 7)
+    for (let i = 0; i < len; i++) {
+      if (i > 0 && i % 6 === 0) hot = Math.floor(r() * 7)
+      const row: Cell[] = []
+      for (let c = 0; c < 7; c++) {
+        const isHot = c >= hot && c < hot + lanesHot
+        row.push(this.cell(isHot ? 12 : this.lane(row0 + i, c)))
+      }
+      rows.push(row)
+    }
+    for (const rr of this.plainAt(row0 + rows.length, 3, 7)) rows.push(rr)
+    return rows
+  }
+
+  /** 한 칸 폭 길이 좌우로 뱀처럼 흐르는 구간 */
+  private weave(row0: number, diff: number): Cell[][] {
+    const r = this.rnd
+    const rows: Cell[][] = []
+    const span = 14 + Math.floor(r() * 12)
+    const width = diff > 0.7 ? 1 : 2
+    const half = (width - 1) / 2
+    const phase = r() * Math.PI * 2
+    for (let i = 0; i < span; i++) {
+      const center = 3 + Math.round(Math.sin(phase + i * 0.42) * (3 - half))
+      const cols: boolean[] = []
+      for (let c = 0; c < 7; c++) cols.push(Math.abs(c - center) <= half)
+      rows.push(this.mkRow(row0 + i, cols))
+    }
+    for (const rr of this.plainAt(row0 + rows.length, 4, 7)) rows.push(rr)
+    return rows
+  }
+
   private supply(row0: number): Cell[][] {
     const r = this.rnd
     this.lastRefillRow = row0
     const rows: Cell[][] = []
-    const diff = Math.min(1, Math.max(0, (row0 - 80) / 2600))
+    const diff = Math.min(1, Math.max(0, (row0 - 80) / 1200))
     // 초반에는 두 칸짜리 보급 패치를 줘서 놓치기 어렵게 한다
     const width = diff > 0.55 ? 1 : 2
     const col = 1 + Math.floor(r() * (6 - width))
@@ -625,6 +789,28 @@ export class EndlessRoad {
 }
 
 function mod(a: number, n: number) { return ((a % n) + n) % n }
+
+/**
+ * 행성 정의에 오버드라이브(최고속·가속 배율)를 얹은 런타임 사본.
+ * 프레임마다 새로 만들지 않도록 행성 인덱스별로 캐시한다.
+ */
+const RUNTIME_PLANETS = new Map<number, Planet>()
+export function runtimePlanet(planetIndex: number): Planet {
+  const cached = RUNTIME_PLANETS.get(planetIndex)
+  if (cached) return cached
+  const base = PLANETS[planetIndex % PLANETS.length]
+  const k = overdrive(planetIndex)
+  // 산소는 행성이 넘어갈수록 조금씩 빡빡해진다
+  const tighten = Math.max(0.72, 1 - planetIndex * 0.035)
+  const p: Planet = {
+    ...base,
+    oxygen: Math.round(base.oxygen * tighten),
+    maxZVel: MAX_ZVEL * k,
+    zAccel: ZACCEL * k,   // 가속도 같은 비율 → 최고속까지 걸리는 시간은 유지
+  }
+  RUNTIME_PLANETS.set(planetIndex, p)
+  return p
+}
 
 export function gravityAccel(gravity: number): number {
   return -Math.floor((gravity * 0x1680) / 0x190) / 0x80
@@ -681,6 +867,10 @@ export class Ship {
     return into
   }
 
+  /** 이번 프레임에 적용할 최고속 (오버드라이브 반영) */
+  private maxZ = MAX_ZVEL
+  private zAccel = ZACCEL
+
   private sanitize() {
     const v = this.v
     v.x = Math.round(v.x * 0x80) / 0x80
@@ -690,6 +880,8 @@ export class Ship {
 
   update(level: EndlessRoad, planet: Planet, expected: Ship, ctl: Controls, ev: ShipEvents) {
     const v = this.v
+    this.maxZ = planet.maxZVel ?? MAX_ZVEL
+    this.zAccel = planet.zAccel ?? ZACCEL
     this.sanitize()
     const canControl = v.state === ShipState.Alive
 
@@ -767,7 +959,7 @@ export class Ship {
   }
 
   private updateZVelocity(canControl: boolean, accel: number) {
-    this.v.vz += (canControl ? accel : 0) * ZACCEL
+    this.v.vz += (canControl ? accel : 0) * this.zAccel
     this.clampZ()
   }
 
@@ -900,7 +1092,7 @@ export class Ship {
   private handleCollision(expected: Ship, ev: ShipEvents) {
     const v = this.v
     if (Math.abs(v.z - expected.v.z) > 0.01) {
-      if (v.vz < (1 / 3) * MAX_ZVEL) {
+      if (v.vz < (1 / 3) * this.maxZ) {
         v.vz = 0
         ev.bumped?.()
       } else if (v.state !== ShipState.Exploded) {
@@ -978,11 +1170,11 @@ export class Ship {
       v.xMovementBase = xm
 
       let zv2 = round32(vz0 + (vz0 * i) / 10)
-      v.vz = clampZ(zv2)
+      v.vz = clampZ(zv2, this.maxZ)
       if (v.vz === zv2 && this.willLandOnTile(ctl, level, planet)) break
 
       zv2 = round32(vz0 - (vz0 * i) / 10)
-      v.vz = clampZ(zv2)
+      v.vz = clampZ(zv2, this.maxZ)
       if (v.vz === zv2 && this.willLandOnTile(ctl, level, planet)) break
 
       v.vz = vz0
@@ -1010,7 +1202,7 @@ export class Ship {
       xPos += xVel * xRate * 128 + v.slideAmount
       if (xPos < ROAD_X0 || xPos > ROAD_X0 + ROAD_W) return false
       yPos += yVel
-      zVel = clampZ(zVel + ctl.accel * ZACCEL)
+      zVel = clampZ(zVel + ctl.accel * this.zAccel, this.maxZ)
       if (yPos <= GROUND_Y) {
         return !this.isOnNothing(level, curX, curZ) && !this.isOnNothing(level, xPos, zPos)
       }
@@ -1018,10 +1210,10 @@ export class Ship {
     return false
   }
 
-  private clampZ() { this.v.vz = clampZ(this.v.vz) }
+  private clampZ() { this.v.vz = clampZ(this.v.vz, this.maxZ) }
 }
 
-function clampZ(z: number) { return Math.min(Math.max(0, z), MAX_ZVEL) }
+function clampZ(z: number, max: number = MAX_ZVEL) { return Math.min(Math.max(0, z), max) }
 
 /* ------------------------------------------------------------------ */
 /* 6. 소프트웨어 래스터라이저 (320x200, VGA 톤의 하드 엣지)              */
@@ -1446,6 +1638,8 @@ export class SkyRoadsGame {
   private expected!: Ship
   private planet!: Planet
   private planetIdx = 0
+  /** 오버드라이브가 반영된 현재 최고속 — HUD 와 렌더 연출이 함께 본다 */
+  private maxZ = MAX_ZVEL
 
   private keys = new Set<string>()
   private acc = 0
@@ -1493,7 +1687,8 @@ export class SkyRoadsGame {
     this.ship = new Ship()
     this.expected = this.ship.clone()
     this.planetIdx = 0
-    this.planet = PLANETS[0]
+    this.planet = runtimePlanet(0)
+    this.maxZ = this.planet.maxZVel ?? MAX_ZVEL
     this.bgPlanet = -1
     this.setBackground(0)
     this.score = 0
@@ -1630,7 +1825,8 @@ export class SkyRoadsGame {
       this.setBackground(pi)
       this.blip(660, 0.08, 'square', 0.16)
     }
-    this.planet = this.road.planetAt(row)
+    this.planet = runtimePlanet(this.road.planetIndexAt(row))
+    this.maxZ = this.planet.maxZVel ?? MAX_ZVEL
 
     const before = v.z
     this.ship.update(this.road, this.planet, this.expected, this.controls(), {
@@ -1696,7 +1892,7 @@ export class SkyRoadsGame {
       gravity: (this.planet.gravity - 3) * 100,
       fuel: v.fuel / FULL_TANK,
       oxygen: v.oxygen / FULL_TANK,
-      speed: v.vz / MAX_ZVEL,
+      speed: v.vz / this.maxZ,
       jumpMaster: v.jumpMasterOn,
       state: this.deathReason ? 'dead' : this.started ? 'playing' : 'ready',
       deathReason: this.deathReason,
@@ -1707,6 +1903,8 @@ export class SkyRoadsGame {
   /* --- 투영 -------------------------------------------------------- */
 
   private camZ = 0
+  private shakeX = 0
+  private shakeY = 0
 
   /**
    * 사각형 하나를 근평면으로 자른 뒤 화면에 채운다.
@@ -1742,8 +1940,8 @@ export class SkyRoadsGame {
     if (n < 3) return
     for (let i = 0; i < n; i++) {
       const s = FOCAL / CZ[i]
-      SX[i] = CENTER_X + CX[i] * s
-      SY[i] = HORIZON_Y - (CY[i] - CAM_Y) * s
+      SX[i] = CENTER_X + this.shakeX + CX[i] * s
+      SY[i] = HORIZON_Y + this.shakeY - (CY[i] - CAM_Y) * s
     }
     this.raster.polyF(SX, SY, n, color)
   }
@@ -1766,7 +1964,14 @@ export class SkyRoadsGame {
     r.clipBottom = SCREEN_H
     r.blit(this.bg)
 
-    this.camZ = v.z * CELL - CAM_BACK
+    // 빠를수록 카메라가 살짝 물러나 시야가 넓어진다 (속도감용 달리 줌)
+    const speedFrac = Math.min(1, v.vz / this.maxZ)
+    const camBack = CAM_BACK * (1 + 0.12 * speedFrac)
+    this.camZ = v.z * CELL - camBack
+    // 최고속 근처에서만 1픽셀 흔들림
+    const shakeAmt = Math.max(0, speedFrac - 0.7) / 0.3
+    this.shakeX = shakeAmt > 0 ? (((this.frame * 7) % 3) - 1) * shakeAmt : 0
+    this.shakeY = shakeAmt > 0 ? (((this.frame * 5) % 3) - 1) * shakeAmt * 0.6 : 0
     r.clipBottom = SCENE_BOTTOM    // 대시보드 뒤로는 그릴 필요 없음
 
     const startRow = Math.max(0, Math.floor(v.z) - 4)
@@ -1785,6 +1990,8 @@ export class SkyRoadsGame {
       // 이 행의 가장 높은 지점(풀블록 윗면)이 화면 아래라면 통째로 생략
       if (HORIZON_Y + (CAM_Y - CUBE_FULL_Y) * (FOCAL / dzFar) >= SCENE_BOTTOM) continue
       const far = zStart - this.camZ > FAR_FACE_Z
+      // 한 행 걸러 윗면을 조금 어둡게 → 도로가 밑으로 흘러가는 게 눈에 보인다
+      const rowK = (z & 1) === 0 ? 1 : 0.86
       // 도로 셀 순서: 화면 중앙에서 먼 컬럼부터 그린다
       const order = [0, 6, 1, 5, 2, 4, 3]
       for (const x of order) {
@@ -1802,7 +2009,7 @@ export class SkyRoadsGame {
 
         if (c.tile !== 0) {
           const base = tiles[c.tile] ?? tiles[1]
-          this.box(xl, xr, TILE_BOTTOM_Y, GROUND_Y, zStart, zEnd, base, drawFront, drawLeft, drawRight)
+          this.box(xl, xr, TILE_BOTTOM_Y, GROUND_Y, zStart, zEnd, base, drawFront, drawLeft, drawRight, rowK)
         }
         if (c.cube !== 0 && !c.tunnel) {
           const base = c.cubeColor ? tiles[c.cubeColor] ?? cubeBase : cubeBase
@@ -1814,6 +2021,7 @@ export class SkyRoadsGame {
       }
     }
 
+    this.drawSpeedStreaks(speedFrac)
     this.drawShip()
 
     if (this.flash > 0) {
@@ -1832,13 +2040,13 @@ export class SkyRoadsGame {
 
   private box(
     xl: number, xr: number, yb: number, yt: number, zNear: number, zFar: number,
-    base: RGB, front: boolean, left: boolean, right: boolean,
+    base: RGB, front: boolean, left: boolean, right: boolean, topK = 1,
   ) {
     // 월드 z 는 진행 방향으로 증가한다 → zNear 쪽 면이 카메라를 향한 앞면이다.
     if (front) this.quad4(xl, yt, zNear, xr, yt, zNear, xr, yb, zNear, xl, yb, zNear, shade(base, K_FRONT))
     if (left) this.quad4(xl, yt, zNear, xl, yb, zNear, xl, yb, zFar, xl, yt, zFar, shade(base, K_LEFT))
     if (right) this.quad4(xr, yt, zNear, xr, yb, zNear, xr, yb, zFar, xr, yt, zFar, shade(base, K_RIGHT))
-    this.quad4(xl, yt, zNear, xr, yt, zNear, xr, yt, zFar, xl, yt, zFar, shade(base, K_TOP))
+    this.quad4(xl, yt, zNear, xr, yt, zNear, xr, yt, zFar, xl, yt, zFar, shade(base, K_TOP * topK))
   }
 
   private tunnelArch(xl: number, xr: number, zStart: number, zEnd: number, base: RGB) {
@@ -1853,6 +2061,33 @@ export class SkyRoadsGame {
       const p1x = cx + Math.cos(a1) * R, p1y = GROUND_Y + Math.sin(a1) * R * YM
       const k = 0.35 + 0.55 * Math.sin((i + 0.5) / SEG * Math.PI)
       this.quad4(p0x, p0y, zStart, p1x, p1y, zStart, p1x, p1y, zEnd, p0x, p0y, zEnd, shade(base, k))
+    }
+  }
+
+  /** 소실점에서 바깥으로 뻗는 선. 도로 위에는 그리지 않아 원작 화면을 해치지 않는다. */
+  private drawSpeedStreaks(speedFrac: number) {
+    if (speedFrac < 0.5) return
+    const r = this.raster
+    const k = (speedFrac - 0.5) / 0.5
+    const col = this.planet.sky.star
+    const c = shade(col, 0.55 + k * 0.45)
+    const n = 18
+    const travel = this.ship.v.z * 0.6
+    for (let i = 0; i < n; i++) {
+      const a = i * 2.39996                       // 황금각으로 고르게 흩는다
+      const t = ((travel + i * 0.618) % 1)
+      const rad = 6 + t * t * 340
+      const dx = Math.cos(a), dy = Math.sin(a)
+      const len = 2 + t * 14 * k
+      for (let l = 0; l < len; l++) {
+        const rr = rad + l
+        const x = CENTER_X + dx * rr * 1.7
+        const y = HORIZON_Y + dy * rr
+        if (y < 2 || y >= SCENE_BOTTOM) break
+        // 도로 실루엣 안쪽이면 건너뛴다 (도로 반폭 = (y-33) * 7/3)
+        if (y > HORIZON_Y && Math.abs(x - CENTER_X) < (y - HORIZON_Y) * 2.34) continue
+        r.px(x, y, c)
+      }
     }
   }
 
@@ -1903,7 +2138,7 @@ export class SkyRoadsGame {
       add([[xa, 11, -16], [xb, 11, -16], [xb, 3, -16], [xa, 3, -16]], shade(HULL_D, 1.1))
       add([[xa + 1, 9, -16.4], [xb - 1, 9, -16.4], [xb - 1, 5, -16.4], [xa + 1, 5, -16.4]], rgba(198 - flick * 40, 52, 44))
       // 엔진 불꽃 — 뒤로 갈수록 좁아지는 판 두 장
-      const thrust = ctl.accel > 0 ? 1 : ctl.accel < 0 ? 0.2 : 0.5
+      const thrust = (ctl.accel > 0 ? 1 : ctl.accel < 0 ? 0.2 : 0.5) * (0.5 + 0.9 * Math.min(1, this.ship.v.vz / this.maxZ))
       const fl = (3 + flick * 4) * thrust + 2
       add([[xa + 2, 8.5, -17 - fl * 0.5], [xb - 2, 8.5, -17 - fl * 0.5], [xb - 2, 5.5, -17 - fl * 0.5], [xa + 2, 5.5, -17 - fl * 0.5]], rgba(252, 200 - flick * 50, 96))
       add([[xa + 3, 8, -17 - fl], [xb - 3, 8, -17 - fl], [xb - 3, 6, -17 - fl], [xa + 3, 6, -17 - fl]], rgba(252, 128 + flick * 50, 48))
@@ -1955,7 +2190,8 @@ export class SkyRoadsGame {
 
     // 큰 다이얼 — 왼쪽 반원은 O2/FUEL 아크, 오른쪽 반원은 34칸 속도계.
     // 분류는 DIAL_KIND/DIAL_STEP 에 미리 구워두고 매 프레임에는 색만 고른다.
-    const speedLit = Math.min(1, v.vz / MAX_ZVEL) * SPEED_STEPS
+    const od = this.maxZ / MAX_ZVEL
+    const speedLit = Math.min(1, v.vz / this.maxZ) * SPEED_STEPS
     const oxyPct = Math.max(0, Math.min(1, v.oxygen / FULL_TANK))
     const fuelPct = Math.max(0, Math.min(1, v.fuel / FULL_TANK))
     const oxyLit = Math.round(oxyPct * ARC_STEPS)
@@ -1987,7 +2223,9 @@ export class SkyRoadsGame {
           case 4: {
             if (step < speedLit) {
               const k = step / SPEED_STEPS
-              c = rgba(80 + k * 175, 210 - k * 60, 255)
+              // 오버드라이브가 붙을수록 눈금이 시안 → 주황으로 달아오른다
+              const heat = Math.min(1, (od - 1) / OVERDRIVE_MAX)
+              c = rgba(80 + k * 175, 210 - k * 60 - heat * 110, 255 - heat * 200)
             } else c = speedOff
             break
           }
@@ -2013,6 +2251,9 @@ export class SkyRoadsGame {
 
     drawText(r, 4, 3, this.planet.name, rgba(255, 224, 96), black)
     drawText(r, 4, 12, `DIST ${Math.floor(this.ship.v.z)}`, dim, black)
+    const spd = Math.round((this.ship.v.vz / MAX_ZVEL) * 100)
+    const spdMax = Math.round((this.maxZ / MAX_ZVEL) * 100)
+    drawText(r, 4, 21, `SPD ${spd}/${spdMax}`, spd >= spdMax ? rgba(120, 240, 255) : dim, black)
     const sc = `SCORE ${Math.floor(this.score)}`
     drawText(r, SCREEN_W - 4 - textWidth(sc), 3, sc, white, black)
 
@@ -2096,7 +2337,7 @@ export class SkyRoadsGame {
       this.engineOsc = o
       this.engineGain = g
     }
-    const t = this.ship.v.vz / MAX_ZVEL
+    const t = this.ship.v.vz / this.maxZ
     this.engineOsc.frequency.setTargetAtTime(48 + t * 92, ac.currentTime, 0.08)
     this.engineGain!.gain.setTargetAtTime(0.012 + t * 0.03, ac.currentTime, 0.1)
   }

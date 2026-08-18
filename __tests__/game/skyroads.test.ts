@@ -1,4 +1,4 @@
-import { Ship, EndlessRoad, PLANETS, gravityAccel, ShipState, TICK } from '@/app/game/skyroads/SkyRoadsGame'
+import { Ship, EndlessRoad, PLANETS, gravityAccel, ShipState, TICK, overdrive, runtimePlanet } from '@/app/game/skyroads/SkyRoadsGame'
 
 function run(planetIdx: number, frames: number, ctl: (f: number, s: Ship) => { turn: number; accel: number; jump: boolean }) {
   const road = new EndlessRoad(12345)
@@ -47,20 +47,33 @@ function autopilot(seed: number, maxFrames = 6000) {
     const targetX = 95 + target * 46 + 23
     const turn = ship.v.x < targetX - 8 ? 1 : ship.v.x > targetX + 8 ? -1 : 0
 
-    // 속도에 맞춰 앞을 보고 점프 (틈의 시작 직전에 뜬다)
-    const emptyAt = (dz: number) => {
+    // 앞의 틈을 찾아, 실제 체공거리로 건널 수 있을 때만 뛴다
+    const solidAt = (dz: number) => {
       const c = road.getCell(ship.v.x, 0, ship.v.z + dz)
-      return c.tile === 0 && c.cube === 0 && !c.tunnel
+      return (c.tile !== 0 || c.cube !== 0 || c.tunnel) && c.tile !== 12
     }
     const blockAt = (dz: number) => road.getCell(ship.v.x, 0, ship.v.z + dz).cube !== 0
-    const killAt = (dz: number) => road.getCell(ship.v.x, 0, ship.v.z + dz).tile === 12
-    const lead = 0.9 + ship.v.vz * 4
-    const needJump = emptyAt(lead) || emptyAt(lead + 0.8) || blockAt(lead) || killAt(lead)
-    const inTunnel = road.getCell(ship.v.x, 0, ship.v.z).tunnel || road.getCell(ship.v.x, 0, ship.v.z + 1).tunnel
-    const jump = needJump && !inTunnel && planet.gravity < 0x14
+    const airFrames = (2 * 9) / Math.abs(gravityAccel(planet.gravity))
+    const reach = airFrames * ship.v.vz
 
-    // 위험 구간에서는 살짝 감속
-    const accel = ship.v.vz < (needJump ? 0.14 : 0.16) ? 1 : 0
+    let gapStart = -1, gapEnd = -1
+    for (let d = 0.6; d < 8; d += 0.5) {
+      if (!solidAt(d)) { gapStart = d; break }
+    }
+    if (gapStart >= 0) {
+      gapEnd = gapStart
+      for (let d = gapStart; d < gapStart + 8; d += 0.5) {
+        if (solidAt(d)) { gapEnd = d; break }
+        gapEnd = d
+      }
+    }
+    const inTunnel = road.getCell(ship.v.x, 0, ship.v.z).tunnel || road.getCell(ship.v.x, 0, ship.v.z + 1).tunnel
+    const nearGap = gapStart >= 0 && gapStart < 1.3
+    const jump = !inTunnel && planet.gravity < 0x14 &&
+      ((nearGap && reach > gapEnd + 0.8) || blockAt(1.0))
+
+    // 틈 앞에서는 최고속을 유지한다
+    const accel = 1
     ship.update(road, planet, exp, { turn, accel, jump }, {})
     if (ship.v.state !== 0 || ship.v.y < -10) break
   }
@@ -108,12 +121,45 @@ describe('SkyRoads 원작 물리', () => {
     expect(ship.v.vz).toBeCloseTo(0x2aaa / 0x10000, 8)
   })
 
-  it('가속 페달을 계속 밟으면 약 146프레임(4.9초)만에 최고속', () => {
+  it('가속 페달을 계속 밟으면 약 146프레임(36Hz 기준 4.1초)만에 최고속', () => {
     const { trace } = run(0, 300, () => ({ turn: 0, accel: 1, jump: false }))
     const idx = trace.findIndex((t) => t.vz >= 0x2aaa / 0x10000 - 1e-9)
     expect(idx).toBeGreaterThan(130)
     expect(idx).toBeLessThan(160)
-    expect(idx * TICK).toBeGreaterThan(4)
+    expect(idx * TICK).toBeGreaterThan(3.5)
+    expect(idx * TICK).toBeLessThan(4.6)
+  })
+
+  it('행성을 넘길 때마다 최고속(오버드라이브)이 올라간다', () => {
+    expect(overdrive(0)).toBeCloseTo(1, 6)
+    expect(overdrive(3)).toBeGreaterThan(overdrive(0))
+    expect(overdrive(20)).toBeCloseTo(1.9, 6)   // 상한
+    const p0 = runtimePlanet(0)
+    const p5 = runtimePlanet(5)
+    expect(p5.maxZVel!).toBeGreaterThan(p0.maxZVel! * 1.4)
+    // 가속도 같은 비율이라 최고속까지 걸리는 프레임 수는 유지된다
+    expect(p5.maxZVel! / p5.zAccel!).toBeCloseTo(p0.maxZVel! / p0.zAccel!, 6)
+
+    // 실제로 더 빨리 달린다
+    const far = (() => {
+      const road = new EndlessRoad(5)
+      road.ensure(400)
+      const ship = new Ship({ vz: p5.maxZVel })
+      const exp = ship.clone()
+      const z0 = ship.v.z
+      for (let f = 0; f < 30; f++) ship.update(road, p5, exp, { turn: 0, accel: 1, jump: false }, {})
+      return ship.v.z - z0
+    })()
+    const near = (() => {
+      const road = new EndlessRoad(5)
+      road.ensure(400)
+      const ship = new Ship({ vz: p0.maxZVel })
+      const exp = ship.clone()
+      const z0 = ship.v.z
+      for (let f = 0; f < 30; f++) ship.update(road, p0, exp, { turn: 0, accel: 1, jump: false }, {})
+      return ship.v.z - z0
+    })()
+    expect(far).toBeGreaterThan(near * 1.4)
   })
 
   it('조향은 전진속도에 비례한다 (정지 상태에서는 거의 못 돈다)', () => {
@@ -181,19 +227,41 @@ describe('SkyRoads 원작 물리', () => {
     expect(ship.v.y).toBeCloseTo(80, 3)
   })
 
-  it('무한 도로가 항상 통과 가능한 컬럼을 남긴다', () => {
+  it('공백 구간이 그 지점에서 점프로 넘을 수 있는 길이를 넘지 않는다', () => {
     const road = new EndlessRoad(4242)
     road.ensure(3000)
-    let emptyStreak = 0
-    let maxStreak = 0
+    let streak = 0
     for (let z = 0; z < 3000; z++) {
       const row = road.rowAt(z)!
       const any = row.some((c) => c.tile !== 0 || c.cube !== 0 || c.tunnel)
-      if (!any) { emptyStreak++; maxStreak = Math.max(maxStreak, emptyStreak) }
-      else emptyStreak = 0
+      if (!any) {
+        streak++
+        expect(streak).toBeLessThanOrEqual(road.maxGap(z))
+      } else streak = 0
     }
-    // 어떤 행성이든 점프로 넘을 수 있는 최대 공백(4칸)을 넘지 않는다
-    expect(maxStreak).toBeLessThanOrEqual(4)
+  })
+
+  it('행성마다 도로 무늬 스타일이 다르다', () => {
+    const styles = new Set(PLANETS.map((p) => p.style))
+    expect(styles.size).toBeGreaterThanOrEqual(3)
+    for (const p of PLANETS) {
+      expect(p.lanes).toHaveLength(7)
+      expect(p.lanesAlt).toHaveLength(7)
+    }
+    // 같은 컬럼이라도 행이 달라지면 색이 바뀌는 구간이 존재한다 (전진 속도 단서)
+    const road = new EndlessRoad(77)
+    road.ensure(2600)
+    let varied = 0
+    for (const idx of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+      const base = idx * 260 + 40
+      const colors = new Set<number>()
+      for (let z = base; z < base + 12; z++) {
+        const c = road.rowAt(z)?.[3]
+        if (c && c.tile) colors.add(c.tile)
+      }
+      if (colors.size > 1) varied++
+    }
+    expect(varied).toBeGreaterThanOrEqual(5)
   })
 
   it('보급 타일이 주기적으로 등장한다', () => {
